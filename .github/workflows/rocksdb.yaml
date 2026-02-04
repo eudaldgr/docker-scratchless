@@ -1,0 +1,69 @@
+name: RocksDB Auto Build
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4/12 * * *"
+
+jobs:
+  rocksdb:
+    name: Build and push RocksDB image if new release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Resolve latest RocksDB version
+        id: version
+        run: |
+          set -euo pipefail
+          LATEST_TAG="$(curl -fsSL https://api.github.com/repos/facebook/rocksdb/releases/latest | jq -r '.tag_name')"
+          if [ -z "${LATEST_TAG}" ] || [ "${LATEST_TAG}" = "null" ]; then
+            echo "Could not resolve latest RocksDB release tag"
+            exit 1
+          fi
+          VERSION="${LATEST_TAG#v}"
+          MINOR="${VERSION%.*}"
+          MAJOR="${VERSION%%.*}"
+          echo "tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "minor=${MINOR}" >> "$GITHUB_OUTPUT"
+          echo "major=${MAJOR}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag exists in GHCR
+        id: exists
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.version }}"
+          if curl -fsSL "https://ghcr.io/v2/eudaldgr/scratchless/tags/list" | jq -e --arg t "rocksdb-${TAG}" '.tags | index($t) != null' > /dev/null; then
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+            echo "Tag rocksdb-${TAG} already exists in GHCR, skipping build."
+          else
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+            echo "Tag rocksdb-${TAG} missing in GHCR, will build."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.exists.outputs.needs_build == 'true'
+
+      - name: Login to GitHub Container Registry
+        if: steps.exists.outputs.needs_build == 'true'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+
+      - name: Setup Docker buildx
+        if: steps.exists.outputs.needs_build == 'true'
+        run: docker buildx create --use
+
+      - name: Build and push RocksDB image
+        if: steps.exists.outputs.needs_build == 'true'
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64,linux/arm64,linux/arm/v7 \
+            --file rocksdb.dockerfile \
+            --build-arg APP_ROOT=/scratchless \
+            --build-arg APP_VERSION=${{ steps.version.outputs.version }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.version }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.minor }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.major }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb \
+            --push .
