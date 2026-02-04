@@ -12,6 +12,7 @@ ARG APP_VERSION \
 RUN set -ex; \
   apk --no-cache --update add \
   git \
+  curl \
   g++ \
   samurai \
   cmake \
