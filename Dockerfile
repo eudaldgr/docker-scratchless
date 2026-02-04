@@ -10,7 +10,7 @@ ARG APP_VERSION
 USER root
 
 RUN set -ex; \
-  mkdir -p ${APP_ROOT}/{etc,run,tmp};
+  mkdir -p ${APP_ROOT}/etc ${APP_ROOT}/run ${APP_ROOT}/tmp;
 
 RUN set -ex; \
   printf "%s\n" \
