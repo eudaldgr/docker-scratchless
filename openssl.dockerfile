@@ -14,6 +14,7 @@ ARG APP_VERSION \
 RUN set -ex; \
   apk --update --no-cache add \
   perl \
+  curl \
   g++ \
   make \
   linux-headers \
