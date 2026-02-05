@@ -1,40 +1,33 @@
-name: Qt Minimal Auto Build
+name: OpenSSL Auto Build
 on:
   workflow_dispatch:
   schedule:
     - cron: "0 4/12 * * *"
 
 jobs:
-  qt_minimal:
-    name: Build and push Qt Minimal image if new release
+  openssl:
+    name: Build and push OpenSSL image if new release
     runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Resolve latest Qt and OpenSSL versions
+      - name: Resolve latest OpenSSL version
         id: version
         run: |
           set -euo pipefail
-          QT_TAG="$(curl -fsSL https://api.github.com/repos/qt/qtbase/tags?per_page=100 | jq -r '.[].name | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))' | sort -V | tail -n1)"
-          if [ -z "${QT_TAG}" ] || [ "${QT_TAG}" = "null" ]; then
-            echo "Could not resolve latest Qt tag"
-            exit 1
-          fi
-          OPENSSL_TAG="$(curl -fsSL https://api.github.com/repos/openssl/openssl/releases/latest | jq -r '.tag_name')"
-          if [ -z "${OPENSSL_TAG}" ] || [ "${OPENSSL_TAG}" = "null" ]; then
+          LATEST_TAG="$(curl -fsSL https://api.github.com/repos/openssl/openssl/releases/latest | jq -r '.tag_name')"
+          if [ -z "${LATEST_TAG}" ] || [ "${LATEST_TAG}" = "null" ]; then
             echo "Could not resolve latest OpenSSL release tag"
             exit 1
           fi
-          VERSION="${QT_TAG#v}"
+          VERSION="${LATEST_TAG#openssl-}"
           MINOR="${VERSION%.*}"
           MAJOR="${VERSION%%.*}"
-          OPENSSL_VERSION="${OPENSSL_TAG#openssl-}"
-          echo "qt_tag=${QT_TAG}" >> "$GITHUB_OUTPUT"
+          echo "tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "minor=${MINOR}" >> "$GITHUB_OUTPUT"
           echo "major=${MAJOR}" >> "$GITHUB_OUTPUT"
-          echo "openssl_version=${OPENSSL_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Get GHCR token
         id: ghcr
@@ -53,12 +46,12 @@ jobs:
           set -euo pipefail
           TAG="${{ steps.version.outputs.version }}"
           TAGS_JSON="$(curl -fsSL -H "Authorization: Bearer ${{ steps.ghcr.outputs.token }}" "https://ghcr.io/v2/${{ github.repository_owner }}/scratchless/tags/list")"
-          if echo "${TAGS_JSON}" | jq -e --arg t "qt-minimal-${TAG}" '.tags | index($t) != null' > /dev/null; then
+          if echo "${TAGS_JSON}" | jq -e --arg t "openssl-${TAG}" '.tags | index($t) != null' > /dev/null; then
             echo "needs_build=false" >> "$GITHUB_OUTPUT"
-            echo "Tag qt-minimal-${TAG} already exists in GHCR, skipping build."
+            echo "Tag openssl-${TAG} already exists in GHCR, skipping build."
           else
             echo "needs_build=true" >> "$GITHUB_OUTPUT"
-            echo "Tag qt-minimal-${TAG} missing in GHCR, will build."
+            echo "Tag openssl-${TAG} missing in GHCR, will build."
           fi
 
       - uses: actions/checkout@v4
@@ -72,22 +65,21 @@ jobs:
         if: steps.exists.outputs.needs_build == 'true'
         run: docker buildx create --use
 
-      - name: Build and push Qt Minimal image
+      - name: Build and push OpenSSL image
         if: steps.exists.outputs.needs_build == 'true'
         run: |
           set -euo pipefail
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --file qt-minimal.dockerfile \
+            --file openssl.dockerfile \
             --build-arg APP_VERSION=${{ steps.version.outputs.version }} \
-            --build-arg APP_OPENSSL_VERSION=${{ steps.version.outputs.openssl_version }} \
-            --build-arg APP_NAME=qt-minimal \
-            --build-arg APP_IMAGE=ghcr.io/${{ github.repository_owner }}/scratchless:qt-minimal-${{ steps.version.outputs.version }} \
+            --build-arg APP_NAME=openssl \
+            --build-arg APP_IMAGE=ghcr.io/${{ github.repository_owner }}/scratchless:openssl-${{ steps.version.outputs.version }} \
             --build-arg APP_ROOT=/scratchless \
-            --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-qt-minimal \
-            --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-qt-minimal,mode=max \
-            --tag ghcr.io/${{ github.repository_owner }}/scratchless:qt-minimal-${{ steps.version.outputs.version }} \
-            --tag ghcr.io/${{ github.repository_owner }}/scratchless:qt-minimal-${{ steps.version.outputs.minor }} \
-            --tag ghcr.io/${{ github.repository_owner }}/scratchless:qt-minimal-${{ steps.version.outputs.major }} \
-            --tag ghcr.io/${{ github.repository_owner }}/scratchless:qt-minimal \
+            --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-openssl \
+            --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-openssl,mode=max \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:openssl-${{ steps.version.outputs.version }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:openssl-${{ steps.version.outputs.minor }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:openssl-${{ steps.version.outputs.major }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:openssl \
             --push .

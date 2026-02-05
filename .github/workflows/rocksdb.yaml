@@ -29,12 +29,24 @@ jobs:
           echo "minor=${MINOR}" >> "$GITHUB_OUTPUT"
           echo "major=${MAJOR}" >> "$GITHUB_OUTPUT"
 
+      - name: Get GHCR token
+        id: ghcr
+        run: |
+          set -euo pipefail
+          TOKEN="$(curl -fsSL -u "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" "https://ghcr.io/token?service=ghcr.io&scope=repository:${{ github.repository_owner }}/scratchless:pull" | jq -r '.token')"
+          if [ -z "${TOKEN}" ] || [ "${TOKEN}" = "null" ]; then
+            echo "Failed to obtain GHCR token" >&2
+            exit 1
+          fi
+          echo "token=${TOKEN}" >> "$GITHUB_OUTPUT"
+
       - name: Check if tag exists in GHCR
         id: exists
         run: |
           set -euo pipefail
           TAG="${{ steps.version.outputs.version }}"
-          if curl -fsSL "https://ghcr.io/v2/eudaldgr/scratchless/tags/list" | jq -e --arg t "rocksdb-${TAG}" '.tags | index($t) != null' > /dev/null; then
+          TAGS_JSON="$(curl -fsSL -H "Authorization: Bearer ${{ steps.ghcr.outputs.token }}" "https://ghcr.io/v2/${{ github.repository_owner }}/scratchless/tags/list")"
+          if echo "${TAGS_JSON}" | jq -e --arg t "rocksdb-${TAG}" '.tags | index($t) != null' > /dev/null; then
             echo "needs_build=false" >> "$GITHUB_OUTPUT"
             echo "Tag rocksdb-${TAG} already exists in GHCR, skipping build."
           else
@@ -62,6 +74,8 @@ jobs:
             --file rocksdb.dockerfile \
             --build-arg APP_ROOT=/scratchless \
             --build-arg APP_VERSION=${{ steps.version.outputs.version }} \
+            --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-rocksdb \
+            --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-rocksdb,mode=max \
             --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.version }} \
             --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.minor }} \
             --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.major }} \
