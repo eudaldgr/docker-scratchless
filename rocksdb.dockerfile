@@ -37,7 +37,7 @@ RUN set -ex; \
 
 RUN set -ex; \
   cd /rocksdb; \
-  PREFIX=${APP_ROOT} \
+  PREFIX=${APP_ROOT}/usr \
   make install-static;
 
 # Final scratch image
