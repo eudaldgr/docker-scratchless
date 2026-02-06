@@ -1,4 +1,4 @@
-name: RocksDB Auto Build
+name: I2PD Auto Build
 on:
   workflow_dispatch:
   schedule:
@@ -16,7 +16,7 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          LATEST_TAG="$(curl -fsSL https://api.github.com/repos/facebook/rocksdb/releases/latest | jq -r '.tag_name')"
+          LATEST_TAG="$(curl -fsSL https://api.github.com/repos/PurpleI2P/i2pd/releases/latest | jq -r '.tag_name')"
           if [ -z "${LATEST_TAG}" ] || [ "${LATEST_TAG}" = "null" ]; then
             echo "Could not resolve latest release tag"
             exit 1
@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           TAG="${{ steps.version.outputs.version }}"
           TAGS_JSON="$(curl -fsSL -H "Authorization: Bearer ${{ steps.ghcr.outputs.token }}" "https://ghcr.io/v2/${{ github.repository_owner }}/scratchless/tags/list" || true)"
-          if echo "${TAGS_JSON}" | jq -e --arg t "rocksdb-${TAG}" '.tags | index($t) != null' > /dev/null; then
+          if echo "${TAGS_JSON}" | jq -e --arg t "i2pd-${TAG}" '.tags | index($t) != null' > /dev/null; then
             echo "needs_build=false" >> "$GITHUB_OUTPUT"
           else
             echo "needs_build=true" >> "$GITHUB_OUTPUT"
@@ -69,15 +69,15 @@ jobs:
           set -euo pipefail
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --file rocksdb.dockerfile \
-            --build-arg APP_IMAGE=${{ github.repository_owner }}/scratchless:rocksdb \
-            --build-arg APP_NAME=rocksdb \
+            --file i2pd.dockerfile \
+            --build-arg APP_IMAGE=${{ github.repository_owner }}/scratchless:i2pd \
+            --build-arg APP_NAME=i2pd \
             --build-arg APP_ROOT=/scratchless \
             --build-arg APP_VERSION=${{ steps.version.outputs.version }} \
-            --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:buildcache-rocksdb \
-            --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:buildcache-rocksdb,mode=max \
-            --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.version }} \
-            --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.minor }} \
-            --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.major }} \
-            --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb \
+            --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:buildcache-i2pd \
+            --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:buildcache-i2pd,mode=max \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:i2pd-${{ steps.version.outputs.version }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:i2pd-${{ steps.version.outputs.minor }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:i2pd-${{ steps.version.outputs.major }} \
+            --tag ghcr.io/${{ github.repository_owner }}/scratchless:i2pd \
             --push .
