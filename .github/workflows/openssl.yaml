@@ -5,14 +5,14 @@ on:
     - cron: "0 4/12 * * *"
 
 jobs:
-  openssl:
-    name: Build and push OpenSSL image if new release
+  build:
+    name: Build and push image if new release
     runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Resolve latest OpenSSL version
+      - name: Resolve latest version
         id: version
         run: |
           set -euo pipefail
@@ -45,13 +45,11 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ steps.version.outputs.version }}"
-          TAGS_JSON="$(curl -fsSL -H "Authorization: Bearer ${{ steps.ghcr.outputs.token }}" "https://ghcr.io/v2/${{ github.repository_owner }}/scratchless/tags/list")"
+          TAGS_JSON="$(curl -fsSL -H "Authorization: Bearer ${{ steps.ghcr.outputs.token }}" "https://ghcr.io/v2/${{ github.repository_owner }}/scratchless/tags/list" || true)"
           if echo "${TAGS_JSON}" | jq -e --arg t "openssl-${TAG}" '.tags | index($t) != null' > /dev/null; then
             echo "needs_build=false" >> "$GITHUB_OUTPUT"
-            echo "Tag openssl-${TAG} already exists in GHCR, skipping build."
           else
             echo "needs_build=true" >> "$GITHUB_OUTPUT"
-            echo "Tag openssl-${TAG} missing in GHCR, will build."
           fi
 
       - uses: actions/checkout@v4
@@ -72,12 +70,12 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --file openssl.dockerfile \
-            --build-arg APP_VERSION=${{ steps.version.outputs.version }} \
+            --build-arg APP_IMAGE=${{ github.repository_owner }}/scratchless:openssl \
             --build-arg APP_NAME=openssl \
-            --build-arg APP_IMAGE=ghcr.io/${{ github.repository_owner }}/scratchless:openssl-${{ steps.version.outputs.version }} \
             --build-arg APP_ROOT=/scratchless \
-            --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-openssl \
-            --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-openssl,mode=max \
+            --build-arg APP_VERSION=${{ steps.version.outputs.version }} \
+            --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:buildcache-openssl \
+            --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:buildcache-openssl,mode=max \
             --tag ghcr.io/${{ github.repository_owner }}/scratchless:openssl-${{ steps.version.outputs.version }} \
             --tag ghcr.io/${{ github.repository_owner }}/scratchless:openssl-${{ steps.version.outputs.minor }} \
             --tag ghcr.io/${{ github.repository_owner }}/scratchless:openssl-${{ steps.version.outputs.major }} \

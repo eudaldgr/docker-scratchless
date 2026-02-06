@@ -5,14 +5,14 @@ on:
     - cron: "0 4/12 * * *"
 
 jobs:
-  rocksdb:
+  build:
     name: Build and push RocksDB image if new release
     runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Resolve latest RocksDB version
+      - name: Resolve latest version
         id: version
         run: |
           set -euo pipefail
@@ -45,13 +45,11 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ steps.version.outputs.version }}"
-          TAGS_JSON="$(curl -fsSL -H "Authorization: Bearer ${{ steps.ghcr.outputs.token }}" "https://ghcr.io/v2/${{ github.repository_owner }}/scratchless/tags/list")"
+          TAGS_JSON="$(curl -fsSL -H "Authorization: Bearer ${{ steps.ghcr.outputs.token }}" "https://ghcr.io/v2/${{ github.repository_owner }}/scratchless/tags/list" || true)"
           if echo "${TAGS_JSON}" | jq -e --arg t "rocksdb-${TAG}" '.tags | index($t) != null' > /dev/null; then
             echo "needs_build=false" >> "$GITHUB_OUTPUT"
-            echo "Tag rocksdb-${TAG} already exists in GHCR, skipping build."
           else
             echo "needs_build=true" >> "$GITHUB_OUTPUT"
-            echo "Tag rocksdb-${TAG} missing in GHCR, will build."
           fi
 
       - uses: actions/checkout@v4
@@ -65,17 +63,19 @@ jobs:
         if: steps.exists.outputs.needs_build == 'true'
         run: docker buildx create --use
 
-      - name: Build and push RocksDB image
+      - name: Build and push image
         if: steps.exists.outputs.needs_build == 'true'
         run: |
           set -euo pipefail
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --file rocksdb.dockerfile \
+            --build-arg APP_IMAGE=${{ github.repository_owner }}/scratchless:rocksdb \
+            --build-arg APP_NAME=rocksdb \
             --build-arg APP_ROOT=/scratchless \
             --build-arg APP_VERSION=${{ steps.version.outputs.version }} \
-            --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-rocksdb \
-            --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:cache-rocksdb,mode=max \
+            --cache-from type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:buildcache-rocksdb \
+            --cache-to type=registry,ref=ghcr.io/${{ github.repository_owner }}/scratchless:buildcache-rocksdb,mode=max \
             --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.version }} \
             --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.minor }} \
             --tag ghcr.io/${{ github.repository_owner }}/scratchless:rocksdb-${{ steps.version.outputs.major }} \
