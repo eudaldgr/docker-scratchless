@@ -17,6 +17,8 @@ RUN set -ex; \
   apk --no-cache --update add \
   --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing \
   binutils \
+  nspr \
+  nss \
   nss-tools;
 
 COPY --from=scratchless / ${APP_ROOT}/
@@ -29,7 +31,16 @@ RUN set -ex; \
   strip ${APP_ROOT}/bin/certutil;
 
 RUN set -ex; \
-  ldd ${APP_ROOT}/bin/certutil | awk '{if (match($3,"/")) print $3}' | xargs -I '{}' cp -v '{}' ${APP_ROOT}/lib/ || true;
+  ldd ${APP_ROOT}/bin/certutil | awk '{if (match($3,"/")) print $3}' | xargs -I '{}' cp -v '{}' ${APP_ROOT}/lib/ || true; \
+  # NSS/NSPR carregades dinàmicament
+  cp -v /usr/lib/libsoftokn3.so ${APP_ROOT}/lib/ || true; \
+  cp -v /usr/lib/libfreebl3.so  ${APP_ROOT}/lib/ || true; \
+  cp -v /usr/lib/libnss*.so     ${APP_ROOT}/lib/ || true; \
+  cp -v /usr/lib/libssl*.so     ${APP_ROOT}/lib/ || true; \
+  cp -v /usr/lib/libsmime*.so   ${APP_ROOT}/lib/ || true; \
+  cp -v /usr/lib/libnspr*.so    ${APP_ROOT}/lib/ || true; \
+  cp -v /usr/lib/libplc*.so     ${APP_ROOT}/lib/ || true; \
+  cp -v /usr/lib/libplds*.so    ${APP_ROOT}/lib/ || true;
 
 RUN set -ex; \
   cp /lib/ld-musl-*.so.1 ${APP_ROOT}/lib/;
