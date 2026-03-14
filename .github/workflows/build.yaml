@@ -343,7 +343,7 @@ jobs:
         id: grype
         uses: anchore/scan-action@v6
         with:
-          image: ${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:${{ github.sha }}
+          image: "docker-archive:./${{ matrix.name }}.tar"
           output-format: sarif
           fail-build: false
 
@@ -356,7 +356,7 @@ jobs:
       - name: Scan with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:${{ github.sha }}
+          input: ./${{ matrix.name }}.tar
           format: sarif
           output: trivy-results-${{ matrix.name }}.sarif
 
@@ -377,7 +377,7 @@ jobs:
           docker run --rm \
             -v "${PWD}":/work -w /work \
             anchore/grype:latest \
-            "${REGISTRY}/${IMAGE_NAME}:${VERSION}" \
+            "docker-archive:/work/${IMAGE_NAME}.tar" \
             -o json > "cve-report-${IMAGE_NAME}.json"
 
       - name: Upload CVE report artifact
