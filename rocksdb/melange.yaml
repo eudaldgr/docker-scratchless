@@ -42,3 +42,11 @@ pipeline:
       DESTDIR="${{targets.destdir}}" \
       PREFIX=/usr \
       make install-static
+
+update:
+  enabled: true
+  github:
+    identifier: facebook/rocksdb
+    use-tag: true
+    tag-filter-prefix: v10.10.
+    strip-prefix: v

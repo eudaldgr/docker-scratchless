@@ -45,3 +45,10 @@ pipeline:
       # Patch config for container use
       sed -i 's/^log = file/log = stdout/' "${{targets.destdir}}/etc/i2pd/i2pd.conf"
       sed -i 's/^loglevel = none/loglevel = error/' "${{targets.destdir}}/etc/i2pd/i2pd.conf"
+
+update:
+  enabled: true
+  github:
+    identifier: PurpleI2P/i2pd
+    use-tag: true
+    tag-filter-prefix: 2.59.
