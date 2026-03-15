@@ -1,0 +1,64 @@
+package:
+  name: tor
+  version: 0.4.9.5
+  epoch: 0
+  description: Tor anonymity network
+  copyright:
+    - license: BSD-3-Clause
+
+environment:
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - autoconf
+      - automake
+      - busybox
+      - build-base
+      - ca-certificates
+      - curl
+      - libevent-dev
+      - libtool
+      - libseccomp-dev
+      - linux-headers
+      - openssl-dev
+      - xz-dev
+      - zlib-dev
+      - zstd-dev
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://gitlab.torproject.org/tpo/core/tor.git
+      tag: tor-${{package.version}}
+
+  - runs: |
+      ./autogen.sh
+
+      ./configure \
+        --prefix=/usr \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --enable-gpl \
+        --disable-manpage \
+        --disable-html-manual \
+        --disable-asciidoc \
+        --disable-systemd
+
+      make -j$(nproc)
+
+      strip src/app/tor src/tools/tor-resolve src/tools/tor-print-ed-signing-cert src/tools/tor-gencert
+
+      mkdir -p "${{targets.destdir}}/usr/bin"
+      cp src/app/tor "${{targets.destdir}}/usr/bin/tor"
+      cp src/tools/tor-resolve "${{targets.destdir}}/usr/bin/tor-resolve"
+      cp src/tools/tor-print-ed-signing-cert "${{targets.destdir}}/usr/bin/tor-print-ed-signing-cert"
+      cp src/tools/tor-gencert "${{targets.destdir}}/usr/bin/tor-gencert"
+
+update:
+  enabled: true
+  git:
+    tag-filter-prefix: tor-0.4.
+    strip-prefix: tor-
