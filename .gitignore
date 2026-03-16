@@ -1,7 +1,10 @@
 .DS_Store
+out/
 packages/
+reports/
+site/
+*.tar.gz
+cve-report-*.json
 melange.rsa
 melange.rsa.pub
-*.tar.gz
-site/
-cve-report-*.json
+sbom*
