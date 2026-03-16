@@ -1,0 +1,103 @@
+package:
+  name: bitcoin-knots
+  version: 29.3.20260210
+  epoch: 0
+  description: Bitcoin Knots daemon
+  copyright:
+    - license: MIT
+
+environment:
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - busybox
+      - build-base
+      - cmake
+      - linux-headers
+      - pkgconf
+      - python3
+      - libevent-dev
+      - boost-dev
+      - zeromq-dev
+      - libzmq-static
+      - gpg
+      - gpg-agent
+      - wget
+      - curl
+      - jq
+
+pipeline:
+  - runs: |
+      set -euo pipefail
+      VER="${{package.version}}"
+      UPSTREAM_VER="${VER%.*}.knots${VER##*.}"
+
+      wget "https://bitcoinknots.org/files/${UPSTREAM_VER%%.*}.x/${UPSTREAM_VER}/bitcoin-${UPSTREAM_VER}.tar.gz" \
+      "https://bitcoinknots.org/files/${UPSTREAM_VER%%.*}.x/${UPSTREAM_VER}/SHA256SUMS.asc" \
+      "https://bitcoinknots.org/files/${UPSTREAM_VER%%.*}.x/${UPSTREAM_VER}/SHA256SUMS" \
+      || \
+      wget "https://github.com/bitcoinknots/bitcoin/releases/download/v${UPSTREAM_VER}/bitcoin-${UPSTREAM_VER}.tar.gz" \
+      "https://github.com/bitcoinknots/bitcoin/releases/download/v${UPSTREAM_VER}/SHA256SUMS.asc" \
+      "https://github.com/bitcoinknots/bitcoin/releases/download/v${UPSTREAM_VER}/SHA256SUMS"
+
+      curl -s "https://api.github.com/repos/bitcoinknots/guix.sigs/contents/builder-keys" | jq -r '.[].download_url' | while read url; do curl -s "$url" | gpg --import; done
+      gpg --verify SHA256SUMS.asc SHA256SUMS
+
+      [ -f SHA256SUMS ] && cp SHA256SUMS sha256sums || cp SHA256SUMS.asc sha256sums
+
+      grep " bitcoin-${UPSTREAM_VER}.tar.gz$" SHA256SUMS | sha256sum -c -
+
+      tar xzf "bitcoin-${UPSTREAM_VER}.tar.gz"
+      cd "bitcoin-${UPSTREAM_VER}"
+
+      export BITCOIN_GENBUILD_NO_GIT=1
+      cmake -B build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DBUILD_BITCOIN_BIN=OFF \
+        -DBUILD_DAEMON=ON \
+        -DBUILD_GUI=OFF \
+        -DBUILD_CLI=ON \
+        -DBUILD_TX=ON \
+        -DBUILD_UTIL=OFF \
+        -DBUILD_UTIL_CHAINSTATE=OFF \
+        -DBUILD_WALLET_TOOL=OFF \
+        -DENABLE_WALLET=OFF \
+        -DENABLE_IPC=OFF \
+        -DENABLE_EXTERNAL_SIGNER=OFF \
+        -DBUILD_TESTS=OFF \
+        -DBUILD_GUI_TESTS=OFF \
+        -DBUILD_BENCH=OFF \
+        -DBUILD_FUZZ_BINARY=OFF \
+        -DBUILD_FOR_FUZZING=OFF \
+        -DBUILD_KERNEL_LIB=OFF \
+        -DWITH_ZMQ=ON \
+        -DWITH_USDT=OFF \
+        -DWITH_QRENCODE=OFF \
+        -DWITH_DBUS=OFF \
+        -DREDUCE_EXPORTS=ON \
+        -DWERROR=OFF \
+        -DWITH_CCACHE=OFF \
+        -DINSTALL_MAN=OFF
+
+      cmake --build build -j "$(nproc)"
+
+      strip build/bin/bitcoind build/bin/bitcoin-cli build/bin/bitcoin-tx
+      mkdir -p "${{targets.destdir}}/usr/bin"
+      cp build/bin/bitcoind "${{targets.destdir}}/usr/bin/bitcoind"
+      cp build/bin/bitcoin-cli "${{targets.destdir}}/usr/bin/bitcoin-cli"
+      cp build/bin/bitcoin-tx "${{targets.destdir}}/usr/bin/bitcoin-tx"
+
+update:
+  enabled: true
+  github:
+    identifier: bitcoinknots/bitcoin
+    use-tag: true
+    tag-filter-prefix: v29.3.knots
+    strip-prefix: v
+  version-transform:
+    - match: \.knots
+      replace: .
