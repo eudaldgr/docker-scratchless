@@ -1,0 +1,62 @@
+package:
+  name: lnd
+  version: 0.20.1_beta
+  epoch: 0
+  description: Lightning Network Daemon
+  copyright:
+    - license: MIT
+
+environment:
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - busybox
+      - gpg
+      - gpg-agent
+      - wget
+
+pipeline:
+  - runs: |
+      set -euo pipefail
+
+      ARCH="${{build.arch}}"
+      case "$ARCH" in
+        x86_64)  ARCH_NAME="amd64" ;;
+        aarch64) ARCH_NAME="arm64" ;;
+      esac
+
+      VER="${{package.version}}"
+      UPSTREAM_VER="${VER/_/-}"
+
+      wget -q "https://github.com/lightningnetwork/lnd/releases/download/v${UPSTREAM_VER}/lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}.tar.gz"
+      wget -q "https://github.com/lightningnetwork/lnd/releases/download/v${UPSTREAM_VER}/manifest-v${UPSTREAM_VER}.txt"
+      wget -q "https://github.com/lightningnetwork/lnd/releases/download/v${UPSTREAM_VER}/manifest-roasbeef-v${UPSTREAM_VER}.sig"
+
+      wget -qO roasbeef.asc "https://raw.githubusercontent.com/lightningnetwork/lnd/master/scripts/keys/roasbeef.asc"
+
+      export GNUPGHOME="$(mktemp -d)"
+      trap 'rm -rf "$GNUPGHOME"' EXIT
+
+      gpg --import roasbeef.asc
+      gpg --verify "manifest-roasbeef-v${UPSTREAM_VER}.sig" "manifest-v${UPSTREAM_VER}.txt"
+      grep " lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}.tar.gz$" "manifest-v${UPSTREAM_VER}.txt" | sha256sum -c -
+
+      tar xzf "lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}.tar.gz"
+
+      mkdir -p "${{targets.destdir}}/usr/bin"
+      cp "lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}/lnd" "${{targets.destdir}}/usr/bin/lnd"
+      cp "lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}/lncli" "${{targets.destdir}}/usr/bin/lncli"
+
+update:
+  enabled: true
+  github:
+    identifier: lightningnetwork/lnd
+    use-tag: true
+    tag-filter-prefix: v0.20.
+    strip-prefix: v
+  version-transform:
+    - match: "-"
+      replace: _
