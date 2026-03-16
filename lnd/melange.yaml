@@ -13,27 +13,22 @@ environment:
     keyring:
       - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
     packages:
+      - build-base
       - busybox
+      - go
       - gpg
       - gpg-agent
       - wget
 
 pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/lightningnetwork/lnd.git
+      tag: v0.20.1-beta
+
   - runs: |
-      set -euo pipefail
-
-      ARCH="${{build.arch}}"
-      case "$ARCH" in
-        x86_64)  ARCH_NAME="amd64" ;;
-        aarch64) ARCH_NAME="arm64" ;;
-      esac
-
       VER="${{package.version}}"
       UPSTREAM_VER="${VER/_/-}"
-
-      wget -q "https://github.com/lightningnetwork/lnd/releases/download/v${UPSTREAM_VER}/lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}.tar.gz"
-      wget -q "https://github.com/lightningnetwork/lnd/releases/download/v${UPSTREAM_VER}/manifest-v${UPSTREAM_VER}.txt"
-      wget -q "https://github.com/lightningnetwork/lnd/releases/download/v${UPSTREAM_VER}/manifest-roasbeef-v${UPSTREAM_VER}.sig"
 
       wget -qO roasbeef.asc "https://raw.githubusercontent.com/lightningnetwork/lnd/master/scripts/keys/roasbeef.asc"
 
@@ -41,14 +36,19 @@ pipeline:
       trap 'rm -rf "$GNUPGHOME"' EXIT
 
       gpg --import roasbeef.asc
-      gpg --verify "manifest-roasbeef-v${UPSTREAM_VER}.sig" "manifest-v${UPSTREAM_VER}.txt"
-      grep " lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}.tar.gz$" "manifest-v${UPSTREAM_VER}.txt" | sha256sum -c -
+      
+      git verify-tag v$UPSTREAM_VER
 
-      tar xzf "lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}.tar.gz"
+  - runs: |
+      GOPATH="/tmp/go" \
+      NO_PROXY="*" \
+      make release-install
 
       mkdir -p "${{targets.destdir}}/usr/bin"
-      cp "lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}/lnd" "${{targets.destdir}}/usr/bin/lnd"
-      cp "lnd-linux-${ARCH_NAME}-v${UPSTREAM_VER}/lncli" "${{targets.destdir}}/usr/bin/lncli"
+      cp /tmp/go/bin/lncli "${{targets.destdir}}/usr/bin/lncli"
+      cp /tmp/go/bin/lnd   "${{targets.destdir}}/usr/bin/lnd"
+
+      strip "${{targets.destdir}}/usr/bin/lncli" "${{targets.destdir}}/usr/bin/lnd"
 
 update:
   enabled: true
