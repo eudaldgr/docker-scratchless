@@ -1,6 +1,6 @@
 package:
   name: lnd
-  version: 0.20.1_beta # renovate: datasource=github-tags depName=lightningnetwork/lnd
+  version: 0.20.1-beta.rc1 # renovate: datasource=github-tags depName=lightningnetwork/lnd
   epoch: 0
   description: Lightning Network Daemon
   copyright:
