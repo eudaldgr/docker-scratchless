@@ -47,7 +47,9 @@
       "matchPackageNames": [
         "AdguardTeam/AdGuardHome",
         "arvidn/libtorrent",
-        "VueTorrent/VueTorrent"
+        "seerr-team/seerr",
+        "VueTorrent/VueTorrent",
+        "vaultwarden/web-vault"
       ],
       "extractVersion": "^v(?<version>.*)$"
     },
