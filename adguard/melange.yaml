@@ -15,7 +15,6 @@ environment:
     packages:
       - build-base
       - busybox
-      - ca-certificates-bundle
       - go-1.26
       - gpg
       - gzip

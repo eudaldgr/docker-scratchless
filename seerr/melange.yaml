@@ -7,6 +7,8 @@ package:
     - license: MIT
 
 environment:
+  environment:
+    NEXT_TELEMETRY_DISABLED: "1"
   contents:
     repositories:
       - &wolfi-repository https://packages.wolfi.dev/os
@@ -16,12 +18,9 @@ environment:
       - bash
       - build-base
       - busybox
-      - ca-certificates-bundle
-      - git
       - nodejs-22-minimal
       - npm
       - pnpm
-      - python3
 
 pipeline:
   - uses: git-checkout

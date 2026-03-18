@@ -24,7 +24,6 @@ environment:
       - bash
       - build-base
       - busybox
-      - ca-certificates-bundle
       - dotnet-10-sdk
       - nodejs
       - pnpm
