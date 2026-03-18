@@ -39,6 +39,7 @@
 | `ghcr.io/vegops/lnd`           | Lightning Network Daemon | Pre-built binaries, GPG verified   |
 | `ghcr.io/vegops/miniupnpc`     | MiniUPnP CLI/Library     | Compiled from source (make)        |
 | `ghcr.io/vegops/openssl`       | OpenSSL CLI              | Wolfi package (apko-only)          |
+| `ghcr.io/vegops/postgres`      | PostgreSQL database      | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/prowlarr`      | Prowlarr indexer manager | Compiled from source (.NET + yarn) |
 | `ghcr.io/vegops/qt-minimal`    | Minimal Qt 6             | Compiled from source (CMake)       |
 | `ghcr.io/vegops/radarr`        | Radarr movie manager     | Compiled from source (.NET + yarn) |
