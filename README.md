@@ -35,6 +35,7 @@
 | `ghcr.io/vegops/adguard`       | AdGuard Home DNS server      | Compiled from source (Go + npm)    |
 | `ghcr.io/vegops/dotnet`        | .NET 10 Runtime              | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/fulcrum`       | Fulcrum SPV server           | Compiled from source (qmake)       |
+| `ghcr.io/vegops/go`            | Go programming language      | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/i2pd`          | I2P daemon                   | Compiled from source (make)        |
 | `ghcr.io/vegops/lnd`           | Lightning Network Daemon     | Pre-built binaries, GPG verified   |
 | `ghcr.io/vegops/miniupnpc`     | MiniUPnP CLI/Library         | Compiled from source (make)        |
