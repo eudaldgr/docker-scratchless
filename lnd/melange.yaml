@@ -23,7 +23,7 @@ environment:
     packages:
       - build-base
       - busybox
-      - go
+      - go-1.26
       - gpg
       - gpg-agent
       - wget
