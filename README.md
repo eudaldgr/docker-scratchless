@@ -43,6 +43,7 @@
 | `ghcr.io/vegops/openssl`       | OpenSSL CLI                  | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/postgres`      | PostgreSQL database          | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/prowlarr`      | Prowlarr indexer manager     | Compiled from source (.NET + yarn) |
+| `ghcr.io/vegops/qbittorrent`   | qBittorrent nox client       | Source-built + VueTorrent          |
 | `ghcr.io/vegops/qt-minimal`    | Minimal Qt 6                 | Compiled from source (CMake)       |
 | `ghcr.io/vegops/radarr`        | Radarr movie manager         | Compiled from source (.NET + yarn) |
 | `ghcr.io/vegops/rocksdb`       | RocksDB static library       | Compiled from source (make)        |
