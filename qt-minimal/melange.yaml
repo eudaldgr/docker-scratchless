@@ -1,6 +1,6 @@
 package:
   name: qt-minimal
-  version: 6.10.2
+  version: 6.11.0
   epoch: 0
   description: Minimal Qt 6
   copyright:
