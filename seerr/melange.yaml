@@ -50,6 +50,9 @@ pipeline:
       COMMIT_TAG="v${{package.version}}" pnpm build
 
       rm -rf .next/cache
+
+      # Prune unnecessary files from node_modules
+      npx --yes @usex/prune-mod@0.0.14 --verbose
       find "${prodroot}/node_modules" -type d \( -name '*musl*' -o -name 'win64-bin' -o -name 'osx-bin' \) -prune -exec rm -rf {} +
       find "${prodroot}/node_modules" -type f \( -name '*.dll' -o -name '*.exe' -o -name '*.node' -path '*musl*' \) -delete
       find "${prodroot}/node_modules" -type d -path '*/prebuilds/*' ! -name "linux-${node_arch}" -prune -exec rm -rf {} +
@@ -65,7 +68,8 @@ pipeline:
         "${{targets.destdir}}/usr/lib/seerr/"
       cp -a "${prodroot}/node_modules" "${{targets.destdir}}/usr/lib/seerr/"
 
-      printf '{"commitTag":"v%s"}\n' "${{package.version}}" > "${{targets.destdir}}/usr/lib/seerr/committag.json"
+      printf '{"commitTag":"v%s"}\n' "${{package.version}}" \
+        > "${{targets.destdir}}/usr/lib/seerr/committag.json"
 
       mkdir -p \
         "${{targets.destdir}}/config/cache/images" \
