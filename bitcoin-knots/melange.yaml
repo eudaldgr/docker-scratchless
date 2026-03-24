@@ -82,11 +82,7 @@ pipeline:
 
   - uses: cmake/build
 
-  - runs: |
-      mkdir -p "${{targets.destdir}}/usr/bin"
-      cp build/bin/bitcoind "${{targets.destdir}}/usr/bin/bitcoind"
-      cp build/bin/bitcoin-cli "${{targets.destdir}}/usr/bin/bitcoin-cli"
-      cp build/bin/bitcoin-tx "${{targets.destdir}}/usr/bin/bitcoin-tx"
+  - uses: cmake/install
 
   - uses: strip
 
