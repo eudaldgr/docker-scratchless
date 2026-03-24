@@ -10,6 +10,7 @@ contents:
     - miniupnpc
     - openssl
     - zlib
+    - tzdata
     - i2pd
 
 accounts:

@@ -18,6 +18,7 @@ contents:
     - libxcrypt
     - lttng-ust
     - sqlite-libs
+    - tzdata
     - zlib
     - sonarr
 

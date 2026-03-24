@@ -7,6 +7,7 @@ contents:
     - wolfi-baselayout
     - ca-certificates-bundle
     - python-3.14 # FulcrumAdmin requires Python 3 to run
+    - tzdata
     - fulcrum
 
 accounts:

@@ -18,6 +18,7 @@ contents:
     - libssl3
     - libcrypto3
     - ca-certificates-bundle
+    - tzdata
     - zlib
     - xz
 

@@ -12,6 +12,7 @@ contents:
     - xz
     - zlib
     - zstd
+    - tzdata
     - tor
 
 accounts:
