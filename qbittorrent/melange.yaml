@@ -106,7 +106,8 @@ pipeline:
       ln -sf /qbittorrent/cache "${{targets.destdir}}/opt/qBittorrent/cache"
       ln -sf /dev/stdout        "${{targets.destdir}}/opt/qBittorrent/logs/qbittorrent.log"
 
-  - runs: |
+  - name: Clean up dotnet runfile mode
+    runs: |
       rm -rf .local
 
   - uses: strip
