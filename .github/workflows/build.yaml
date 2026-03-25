@@ -32,6 +32,7 @@ env:
   MELANGE_SIGNING_KEY: ${{ secrets.MELANGE_SIGNING_KEY }}
   MELANGE_SIGNING_KEY_PUB: ${{ secrets.MELANGE_SIGNING_KEY_PUB }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  MAX_DEP_TIER: 5
 
 jobs:
   ##############################################################################
@@ -41,7 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       base_packages: ${{ steps.set.outputs.base_packages }}
-      deps_build_order: ${{ steps.set.outputs.deps_build_order }}
+      deps_tier_1: ${{ steps.set.outputs.deps_tier_1 }}
+      deps_tier_2: ${{ steps.set.outputs.deps_tier_2 }}
+      deps_tier_3: ${{ steps.set.outputs.deps_tier_3 }}
+      deps_tier_4: ${{ steps.set.outputs.deps_tier_4 }}
+      deps_tier_5: ${{ steps.set.outputs.deps_tier_5 }}
       apko_images: ${{ steps.set.outputs.apko_images }}
     steps:
       - uses: actions/checkout@v6
@@ -128,12 +133,50 @@ jobs:
             remaining=("${next[@]}")
           done
 
+          MAX_TIERS=${{ env.MAX_DEP_TIER }}
+
+          declare -A pkg_level
+          for pkg in "${base_packages[@]}"; do
+            pkg_level["$pkg"]=0
+          done
+
+          for i in $(seq 1 "$MAX_TIERS"); do
+            declare -a "tier_$i=()"
+          done
+
+          for pkg in "${sorted_deps[@]}"; do
+            max_dep_level=0
+            for dep in ${deps_of[$pkg]}; do
+              dep_lvl=${pkg_level[$dep]:-0}
+              if [ "$dep_lvl" -gt "$max_dep_level" ]; then
+                max_dep_level=$dep_lvl
+              fi
+            done
+
+            level=$((max_dep_level + 1))
+            if [ "$level" -gt "$MAX_TIERS" ]; then
+              echo "::error::Package '$pkg' requires tier $level but max is $MAX_TIERS. Add more tier jobs to the workflow."
+              exit 1
+            fi
+
+            pkg_level["$pkg"]=$level
+            eval "tier_${level}+=(\"$pkg\")"
+          done
+
           echo "base_packages=$(json_array "${base_packages[@]}")" >> "$GITHUB_OUTPUT"
-          echo "deps_build_order=$(json_array "${sorted_deps[@]}")" >> "$GITHUB_OUTPUT"
+          for i in $(seq 1 "$MAX_TIERS"); do
+            eval "pkgs=(\"\${tier_${i}[@]}\")"
+            echo "deps_tier_${i}=$(json_array "${pkgs[@]}")" >> "$GITHUB_OUTPUT"
+          done
           echo "apko_images=$(json_array "${all_apko[@]}")" >> "$GITHUB_OUTPUT"
 
           echo "Base: ${base_packages[*]:-<none>}"
-          echo "Deps build order: ${sorted_deps[*]:-<none>}"
+          for i in $(seq 1 "$MAX_TIERS"); do
+            eval "pkgs=(\"\${tier_${i}[@]}\")"
+            if [ "${#pkgs[@]}" -gt 0 ]; then
+              echo "Deps tier $i: ${pkgs[*]}"
+            fi
+          done
           echo "Images: ${all_apko[*]:-<none>}"
 
   ##############################################################################
@@ -198,18 +241,177 @@ jobs:
           melange-version: ${{ env.MELANGE_VERSION }}
 
   ##############################################################################
-  # TIER 2: BUILD DEPENDENT MELANGE PACKAGES (topological order, per package)  #
+  # TIER 2+: BUILD DEPENDENT MELANGE PACKAGES (tiered by dependency depth)     #
   ##############################################################################
-  melange-build-deps:
+  melange-build-deps-tier-1:
     needs: [discover, keygen, melange-build-base]
-    if: always() && needs.discover.outputs.deps_build_order != '[]' && needs.discover.outputs.deps_build_order != '[""]' && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped')
+    if: >-
+      always()
+      && needs.discover.outputs.deps_tier_1 != '[]'
+      && needs.discover.outputs.deps_tier_1 != '[""]'
+      && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped')
     permissions:
       contents: read
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
-        name: ${{ fromJson(needs.discover.outputs.deps_build_order) }}
+        name: ${{ fromJson(needs.discover.outputs.deps_tier_1) }}
+        arch: [x86_64, aarch64]
+
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build package
+        uses: ./.github/actions/melange-build
+        with:
+          package-name: ${{ matrix.name }}
+          arch: ${{ matrix.arch }}
+          has-dependencies: "true"
+          event-name: ${{ github.event_name }}
+          signing-key-secret: ${{ env.MELANGE_SIGNING_KEY }}
+          signing-key-pub-secret: ${{ env.MELANGE_SIGNING_KEY_PUB }}
+          melange-version: ${{ env.MELANGE_VERSION }}
+
+  melange-build-deps-tier-2:
+    needs: [discover, keygen, melange-build-base, melange-build-deps-tier-1]
+    if: >-
+      always()
+      && needs.discover.outputs.deps_tier_2 != '[]'
+      && needs.discover.outputs.deps_tier_2 != '[""]'
+      && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped')
+      && (needs.melange-build-deps-tier-1.result == 'success' || needs.melange-build-deps-tier-1.result == 'skipped')
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        name: ${{ fromJson(needs.discover.outputs.deps_tier_2) }}
+        arch: [x86_64, aarch64]
+
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build package
+        uses: ./.github/actions/melange-build
+        with:
+          package-name: ${{ matrix.name }}
+          arch: ${{ matrix.arch }}
+          has-dependencies: "true"
+          event-name: ${{ github.event_name }}
+          signing-key-secret: ${{ env.MELANGE_SIGNING_KEY }}
+          signing-key-pub-secret: ${{ env.MELANGE_SIGNING_KEY_PUB }}
+          melange-version: ${{ env.MELANGE_VERSION }}
+
+  melange-build-deps-tier-3:
+    needs:
+      [
+        discover,
+        keygen,
+        melange-build-base,
+        melange-build-deps-tier-1,
+        melange-build-deps-tier-2,
+      ]
+    if: >-
+      always()
+      && needs.discover.outputs.deps_tier_3 != '[]'
+      && needs.discover.outputs.deps_tier_3 != '[""]'
+      && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped')
+      && (needs.melange-build-deps-tier-2.result == 'success' || needs.melange-build-deps-tier-2.result == 'skipped')
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        name: ${{ fromJson(needs.discover.outputs.deps_tier_3) }}
+        arch: [x86_64, aarch64]
+
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build package
+        uses: ./.github/actions/melange-build
+        with:
+          package-name: ${{ matrix.name }}
+          arch: ${{ matrix.arch }}
+          has-dependencies: "true"
+          event-name: ${{ github.event_name }}
+          signing-key-secret: ${{ env.MELANGE_SIGNING_KEY }}
+          signing-key-pub-secret: ${{ env.MELANGE_SIGNING_KEY_PUB }}
+          melange-version: ${{ env.MELANGE_VERSION }}
+
+  melange-build-deps-tier-4:
+    needs:
+      [
+        discover,
+        keygen,
+        melange-build-base,
+        melange-build-deps-tier-1,
+        melange-build-deps-tier-2,
+        melange-build-deps-tier-3,
+      ]
+    if: >-
+      always()
+      && needs.discover.outputs.deps_tier_4 != '[]'
+      && needs.discover.outputs.deps_tier_4 != '[""]'
+      && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped')
+      && (needs.melange-build-deps-tier-3.result == 'success' || needs.melange-build-deps-tier-3.result == 'skipped')
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        name: ${{ fromJson(needs.discover.outputs.deps_tier_4) }}
+        arch: [x86_64, aarch64]
+
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build package
+        uses: ./.github/actions/melange-build
+        with:
+          package-name: ${{ matrix.name }}
+          arch: ${{ matrix.arch }}
+          has-dependencies: "true"
+          event-name: ${{ github.event_name }}
+          signing-key-secret: ${{ env.MELANGE_SIGNING_KEY }}
+          signing-key-pub-secret: ${{ env.MELANGE_SIGNING_KEY_PUB }}
+          melange-version: ${{ env.MELANGE_VERSION }}
+
+  melange-build-deps-tier-5:
+    needs:
+      [
+        discover,
+        keygen,
+        melange-build-base,
+        melange-build-deps-tier-1,
+        melange-build-deps-tier-2,
+        melange-build-deps-tier-3,
+        melange-build-deps-tier-4,
+      ]
+    if: >-
+      always()
+      && needs.discover.outputs.deps_tier_5 != '[]'
+      && needs.discover.outputs.deps_tier_5 != '[""]'
+      && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped')
+      && (needs.melange-build-deps-tier-4.result == 'success' || needs.melange-build-deps-tier-4.result == 'skipped')
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        name: ${{ fromJson(needs.discover.outputs.deps_tier_5) }}
         arch: [x86_64, aarch64]
 
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
@@ -233,8 +435,26 @@ jobs:
   # FINAL TIER: BUILD ALL IMAGES (depends on all melange packages)             #
   ##############################################################################
   build-images:
-    needs: [discover, melange-build-base, melange-build-deps]
-    if: always() && needs.discover.outputs.apko_images != '[]' && needs.discover.outputs.apko_images != '[""]' && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped') && (needs.melange-build-deps.result == 'success' || needs.melange-build-deps.result == 'skipped')
+    needs:
+      [
+        discover,
+        melange-build-base,
+        melange-build-deps-tier-1,
+        melange-build-deps-tier-2,
+        melange-build-deps-tier-3,
+        melange-build-deps-tier-4,
+        melange-build-deps-tier-5,
+      ]
+    if: >-
+      always()
+      && needs.discover.outputs.apko_images != '[]'
+      && needs.discover.outputs.apko_images != '[""]'
+      && (needs.melange-build-base.result == 'success' || needs.melange-build-base.result == 'skipped')
+      && (needs.melange-build-deps-tier-1.result == 'success' || needs.melange-build-deps-tier-1.result == 'skipped')
+      && (needs.melange-build-deps-tier-2.result == 'success' || needs.melange-build-deps-tier-2.result == 'skipped')
+      && (needs.melange-build-deps-tier-3.result == 'success' || needs.melange-build-deps-tier-3.result == 'skipped')
+      && (needs.melange-build-deps-tier-4.result == 'success' || needs.melange-build-deps-tier-4.result == 'skipped')
+      && (needs.melange-build-deps-tier-5.result == 'success' || needs.melange-build-deps-tier-5.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -262,7 +482,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download all packages
-        if: needs.discover.outputs.base_packages != '[]' || needs.discover.outputs.deps_build_order != '[]'
+        if: >-
+          needs.discover.outputs.base_packages != '[]'
+          || needs.discover.outputs.deps_tier_1 != '[]'
+          || needs.discover.outputs.deps_tier_2 != '[]'
+          || needs.discover.outputs.deps_tier_3 != '[]'
+          || needs.discover.outputs.deps_tier_4 != '[]'
+          || needs.discover.outputs.deps_tier_5 != '[]'
         uses: actions/download-artifact@v8
         with:
           pattern: packages-*-*
@@ -374,7 +600,17 @@ jobs:
   # SUMMARY                                                                    #
   ##############################################################################
   summary:
-    needs: [discover, melange-build-base, melange-build-deps, build-images]
+    needs:
+      [
+        discover,
+        melange-build-base,
+        melange-build-deps-tier-1,
+        melange-build-deps-tier-2,
+        melange-build-deps-tier-3,
+        melange-build-deps-tier-4,
+        melange-build-deps-tier-5,
+        build-images,
+      ]
     runs-on: ubuntu-latest
     if: always()
     permissions: {}
@@ -383,11 +619,19 @@ jobs:
         run: |
           DISCOVER="${{ needs.discover.result }}"
           BASE="${{ needs.melange-build-base.result }}"
-          DEPS="${{ needs.melange-build-deps.result }}"
+          DEPS_TIER_1="${{ needs.melange-build-deps-tier-1.result }}"
+          DEPS_TIER_2="${{ needs.melange-build-deps-tier-2.result }}"
+          DEPS_TIER_3="${{ needs.melange-build-deps-tier-3.result }}"
+          DEPS_TIER_4="${{ needs.melange-build-deps-tier-4.result }}"
+          DEPS_TIER_5="${{ needs.melange-build-deps-tier-5.result }}"
           BUILD_IMAGES="${{ needs.build-images.result }}"
           echo "discover: $DISCOVER"
           echo "melange-build-base: $BASE"
-          echo "melange-build-deps: $DEPS"
+          echo "melange-build-deps-tier-1: $DEPS_TIER_1"
+          echo "melange-build-deps-tier-2: $DEPS_TIER_2"
+          echo "melange-build-deps-tier-3: $DEPS_TIER_3"
+          echo "melange-build-deps-tier-4: $DEPS_TIER_4"
+          echo "melange-build-deps-tier-5: $DEPS_TIER_5"
           echo "build-images: $BUILD_IMAGES"
 
           if [[ "$DISCOVER" != "success" ]]; then
@@ -400,8 +644,28 @@ jobs:
             exit 1
           fi
 
-          if [[ "$DEPS" != "success" && "$DEPS" != "skipped" ]]; then
-            echo "::error::Dependent package build did not succeed"
+          if [[ "$DEPS_TIER_1" != "success" && "$DEPS_TIER_1" != "skipped" ]]; then
+            echo "::error::Dependent package build tier 1 did not succeed"
+            exit 1
+          fi
+
+          if [[ "$DEPS_TIER_2" != "success" && "$DEPS_TIER_2" != "skipped" ]]; then
+            echo "::error::Dependent package build tier 2 did not succeed"
+            exit 1
+          fi
+
+          if [[ "$DEPS_TIER_3" != "success" && "$DEPS_TIER_3" != "skipped" ]]; then
+            echo "::error::Dependent package build tier 3 did not succeed"
+            exit 1
+          fi
+
+          if [[ "$DEPS_TIER_4" != "success" && "$DEPS_TIER_4" != "skipped" ]]; then
+            echo "::error::Dependent package build tier 4 did not succeed"
+            exit 1
+          fi
+
+          if [[ "$DEPS_TIER_5" != "success" && "$DEPS_TIER_5" != "skipped" ]]; then
+            echo "::error::Dependent package build tier 5 did not succeed"
             exit 1
           fi
 
