@@ -198,7 +198,7 @@ jobs:
           melange-version: ${{ env.MELANGE_VERSION }}
 
   ##############################################################################
-  # TIER 2: BUILD DEPENDENT MELANGE PACKAGES (topological order per arch)      #
+  # TIER 2: BUILD DEPENDENT MELANGE PACKAGES (topological order, per package)  #
   ##############################################################################
   melange-build-deps:
     needs: [discover, keygen, melange-build-base]
@@ -207,79 +207,27 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
+        name: ${{ fromJson(needs.discover.outputs.deps_build_order) }}
         arch: [x86_64, aarch64]
 
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    timeout-minutes: 360
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install melange
-        uses: ./.github/actions/setup-tools
+      - name: Build package
+        uses: ./.github/actions/melange-build
         with:
+          package-name: ${{ matrix.name }}
+          arch: ${{ matrix.arch }}
+          has-dependencies: "true"
+          event-name: ${{ github.event_name }}
+          signing-key-secret: ${{ env.MELANGE_SIGNING_KEY }}
+          signing-key-pub-secret: ${{ env.MELANGE_SIGNING_KEY_PUB }}
           melange-version: ${{ env.MELANGE_VERSION }}
-
-      - name: Download ephemeral signing key (PR)
-        if: github.event_name == 'pull_request'
-        uses: actions/download-artifact@v8
-        with:
-          name: melange-ephemeral-key
-          path: .
-
-      - name: Setup signing key (protected branch)
-        if: github.event_name != 'pull_request'
-        run: |
-          set -euo pipefail
-          printf '%s\n' "${{ env.MELANGE_SIGNING_KEY }}" > melange.rsa
-          printf '%s\n' "${{ env.MELANGE_SIGNING_KEY_PUB }}" > melange.rsa.pub
-          chmod 600 melange.rsa
-
-      - name: Download base packages
-        uses: actions/download-artifact@v8
-        with:
-          pattern: packages-*-${{ matrix.arch }}
-          merge-multiple: true
-          path: .
-
-      - name: Build dependent packages in topological order
-        env:
-          DEPS_BUILD_ORDER: ${{ needs.discover.outputs.deps_build_order }}
-        run: |
-          set -euo pipefail
-          chmod 600 melange.rsa
-
-          for pkg in $(echo "$DEPS_BUILD_ORDER" | jq -r '.[]'); do
-            echo "Building $pkg for ${{ matrix.arch }}"
-
-            if [ -d "packages/${{ matrix.arch }}" ] && compgen -G "packages/${{ matrix.arch }}/*.apk" > /dev/null; then
-              melange index --signing-key melange.rsa -o "packages/${{ matrix.arch }}/APKINDEX.tar.gz" "packages/${{ matrix.arch }}"/*.apk
-            fi
-
-            melange build "$pkg/melange.yaml" \
-              --arch "${{ matrix.arch }}" \
-              --signing-key melange.rsa \
-              --repository-append ./packages \
-              --keyring-append ./melange.rsa.pub \
-              --out-dir ./packages \
-              --runner docker
-
-            melange test "$pkg/melange.yaml" \
-              --arch "${{ matrix.arch }}" \
-              --repository-append ./packages \
-              --keyring-append ./melange.rsa.pub \
-              --runner docker
-          done
-
-      - name: Upload packages
-        uses: actions/upload-artifact@v7
-        with:
-          name: packages-deps-${{ matrix.arch }}
-          path: |
-            packages/
-            melange.rsa.pub
-          retention-days: 1
 
   ##############################################################################
   # FINAL TIER: BUILD ALL IMAGES (depends on all melange packages)             #
