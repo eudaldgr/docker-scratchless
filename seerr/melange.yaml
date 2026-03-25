@@ -25,7 +25,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/seerr-team/seerr.git
+      repository: https://github.com/seerr-team/seerr
       tag: v${{package.version}}
 
   - runs: |

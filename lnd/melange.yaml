@@ -31,7 +31,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/lightningnetwork/lnd.git
+      repository: https://github.com/lightningnetwork/lnd
       tag: v${{vars.upstream-version}}
 
   - runs: |

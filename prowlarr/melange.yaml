@@ -32,7 +32,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/Prowlarr/Prowlarr.git
+      repository: https://github.com/Prowlarr/Prowlarr
       tag: v${{package.version}}
 
   - runs: |

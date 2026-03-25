@@ -24,7 +24,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/PurpleI2P/i2pd.git
+      repository: https://github.com/PurpleI2P/i2pd
       tag: ${{package.version}}
 
   - runs: |

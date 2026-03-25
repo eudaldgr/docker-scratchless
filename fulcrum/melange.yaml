@@ -29,7 +29,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/cculianu/Fulcrum.git
+      repository: https://github.com/cculianu/Fulcrum
       tag: v${{package.version}}
 
   - runs: |

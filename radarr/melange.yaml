@@ -32,7 +32,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/Radarr/Radarr.git
+      repository: https://github.com/Radarr/Radarr
       tag: v${{package.version}}
 
   - runs: |

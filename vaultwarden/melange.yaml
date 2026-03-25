@@ -33,7 +33,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/dani-garcia/vaultwarden.git
+      repository: https://github.com/dani-garcia/vaultwarden
       tag: ${{package.version}}
 
   - runs: |

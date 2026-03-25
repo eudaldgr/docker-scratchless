@@ -32,7 +32,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/bitcoin/bitcoin.git
+      repository: https://github.com/bitcoin/bitcoin
       tag: v${{package.version}}
 
   - runs: |

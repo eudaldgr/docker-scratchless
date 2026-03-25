@@ -27,7 +27,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/AdguardTeam/AdGuardHome.git
+      repository: https://github.com/AdguardTeam/AdGuardHome
       tag: v${{package.version}}
 
   - runs: |

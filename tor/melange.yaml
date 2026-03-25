@@ -31,7 +31,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://gitlab.torproject.org/tpo/core/tor.git
+      repository: https://gitlab.torproject.org/tpo/core/tor
       tag: tor-${{package.version}}
 
   - runs: |

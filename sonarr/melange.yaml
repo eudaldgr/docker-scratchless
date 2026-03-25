@@ -32,7 +32,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/Sonarr/Sonarr.git
+      repository: https://github.com/Sonarr/Sonarr
       tag: v${{package.version}}
 
   - runs: |

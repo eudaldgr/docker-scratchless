@@ -38,7 +38,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/bitcoinknots/bitcoin.git
+      repository: https://github.com/bitcoinknots/bitcoin
       tag: v${{vars.upstream-version}}
 
   - runs: |

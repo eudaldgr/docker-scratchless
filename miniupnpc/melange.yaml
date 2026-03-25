@@ -24,7 +24,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/miniupnp/miniupnp.git
+      repository: https://github.com/miniupnp/miniupnp
       tag: miniupnpc_${{vars.upstream-version}}
 
   - runs: |
