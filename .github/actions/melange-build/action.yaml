@@ -91,7 +91,8 @@ runs:
         melange test "${{ inputs.package-name }}/melange.yaml" \
           --arch "${{ inputs.arch }}" \
           --repository-append ./packages \
-          --keyring-append ./melange.rsa.pub
+          --keyring-append ./melange.rsa.pub \
+          --runner docker
 
     - name: Upload packages
       uses: actions/upload-artifact@v7
