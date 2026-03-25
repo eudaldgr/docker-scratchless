@@ -30,7 +30,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/arvidn/libtorrent.git
+      repository: https://github.com/arvidn/libtorrent
       tag: v${{package.version}}
       recurse-submodules: "true"
 

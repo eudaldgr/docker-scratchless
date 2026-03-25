@@ -45,7 +45,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://github.com/qbittorrent/qBittorrent.git
+      repository: https://github.com/qbittorrent/qBittorrent
       tag: release-${{package.version}}
 
   - name: Download VueTorrent
