@@ -3,7 +3,11 @@
   "extends": [
     "config:recommended"
   ],
+  "assignAutomerge": true,
   "ignoreUnstable": true,
+  "reviewers": [
+    "eudaldgr"
+  ],
   "packageRules": [
     {
       "groupName": "github-actions",
