@@ -35,6 +35,8 @@ environment:
 pipeline:
   - runs: |
       set -eu
+      export GNUPGHOME="$(mktemp -d)"
+      trap 'rm -rf "$GNUPGHOME"' EXIT
       gpg --import key.txt
 
   - name: Download official Plex package
