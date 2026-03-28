@@ -17,7 +17,7 @@ runs:
   steps:
     - name: Scan with Grype (SARIF)
       id: grype-sarif
-      uses: anchore/scan-action@v7
+      uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
       with:
         image: docker-archive:./${{ inputs.image-tar }}
         output-format: sarif
@@ -25,7 +25,7 @@ runs:
 
     - name: Scan with Grype (JSON)
       id: grype-json
-      uses: anchore/scan-action@v7
+      uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
       with:
         image: docker-archive:./${{ inputs.image-tar }}
         output-format: json
@@ -38,33 +38,33 @@ runs:
         mv "${{ steps.grype-json.outputs.json }}" "cve-report-${{ inputs.image-name }}-${{ inputs.arch }}.json"
 
     - name: Upload Grype SARIF
-      uses: github/codeql-action/upload-sarif@v4
+      uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
       with:
         sarif_file: ${{ steps.grype-sarif.outputs.sarif }}
         category: grype-${{ inputs.image-name }}-${{ inputs.arch }}
 
     - name: Scan with Trivy
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
       with:
         input: ./${{ inputs.image-tar }}
         format: sarif
         output: trivy-results-${{ inputs.image-name }}-${{ inputs.arch }}.sarif
 
     - name: Upload Trivy SARIF
-      uses: github/codeql-action/upload-sarif@v4
+      uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
       with:
         sarif_file: trivy-results-${{ inputs.image-name }}-${{ inputs.arch }}.sarif
         category: trivy-${{ inputs.image-name }}-${{ inputs.arch }}
 
     - name: Upload CVE report artifact
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: cve-report-${{ inputs.image-name }}-${{ inputs.arch }}
         path: cve-report-${{ inputs.image-name }}-${{ inputs.arch }}.json
         retention-days: 90
 
     - name: Upload SBOM artifact
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: sbom-${{ inputs.image-name }}-${{ inputs.arch }}
         path: sbom-*.spdx.json
