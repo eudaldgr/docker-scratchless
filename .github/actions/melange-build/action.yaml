@@ -72,7 +72,7 @@ runs:
     - name: Build package with melange
       uses: chainguard-dev/actions/melange-build-pkg@8bb24c24be6871bee44f19be55ea11e3b2aea3dd # v1.6.11
       with:
-        config: ${{ inputs.package-name }}/melange.yaml
+        config: melange.yaml
         archs: ${{ inputs.arch }}
         sign-with-key: true
         signing-key-path: ${{ github.workspace }}/melange.rsa
@@ -80,6 +80,7 @@ runs:
         repository-append: ${{ github.workspace }}/packages
         keyring-append: ${{ github.workspace }}/melange.rsa.pub
         source-dir: ${{ github.workspace }}
+        workdir: ${{ inputs.package-name }}
 
     - name: Run smoke tests
       shell: bash
