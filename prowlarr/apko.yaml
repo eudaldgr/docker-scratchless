@@ -33,18 +33,14 @@ accounts:
   run-as: "65532"
 
 entrypoint:
-  command: /usr/lib/prowlarr/Prowlarr
+  command: /opt/prowlarr/Prowlarr
 
-cmd: -nobrowser -data=/config
+cmd: -nobrowser -data=/prowlarr/etc
 
-work-dir: /config
-
-environment:
-  HOME: /config
-  TZ: UTC
+work-dir: /
 
 paths:
-  - path: /config
+  - path: /prowlarr/etc
     type: directory
     uid: 65532
     gid: 65532
