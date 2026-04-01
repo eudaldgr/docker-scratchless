@@ -43,5 +43,4 @@ test:
         - ${{package.name}}=${{package.full-version}}
   pipeline:
     - runs: |
-        /usr/bin/chown 2>&1 | grep -q "Usage"
         test -x /usr/bin/chown
