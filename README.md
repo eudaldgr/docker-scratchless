@@ -33,6 +33,7 @@
 | `ghcr.io/vegops/adguard`            | AdGuard Home DNS server      | Compiled from source (Go + npm)    |
 | `ghcr.io/vegops/bitcoin-core`       | Bitcoin Core daemon          | Pre-built binaries, GPG verified   |
 | `ghcr.io/vegops/bitcoin-knots`      | Bitcoin Knots daemon         | Compiled from source (CMake)       |
+| `ghcr.io/vegops/chown`              | chown CLI                    | Custom build with musl (.NET)      |
 | `ghcr.io/vegops/dotnet`             | .NET 10 Runtime              | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/electrs`            | Electrum Rust Server         | Compiled from source (Rust)        |
 | `ghcr.io/vegops/fulcrum`            | Fulcrum SPV server           | Compiled from source (qmake)       |

@@ -1,0 +1,72 @@
+package:
+  name: chown
+  version: 0.1.0
+  epoch: 0
+  description: Minimal chown for distroless containers
+  copyright:
+    - license: MIT
+
+environment:
+  environment:
+    DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    DOTNET_NOLOGO: "true"
+    DOTNET_GENERATE_ASPNET_CERTIFICATE: "0"
+  contents:
+    repositories:
+      - &alpine-main-repository https://dl-cdn.alpinelinux.org/alpine/edge/main
+      - &alpine-community-repository https://dl-cdn.alpinelinux.org/alpine/edge/community
+    packages:
+      - build-base
+      - busybox
+      - ca-certificates-bundle
+      - dotnet10-sdk
+
+pipeline:
+  - runs: |
+      arch="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/x64/')"
+      dotnet publish chown.cs -c Release -r "linux-musl-${arch}" -o .
+      rm -rf .local
+
+  - runs: |
+      install -Dm755 chown "${{targets.destdir}}/usr/bin/chown"
+
+  - uses: strip
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *alpine-main-repository
+        - *alpine-community-repository
+      packages:
+        - busybox
+        - ${{package.name}}=${{package.full-version}}
+  pipeline:
+    - runs: |
+        chown 2>&1 | grep -q "Usage"
+
+        # Setup
+        mkdir -p /tmp/chown-test/real/sub /tmp/chown-test/secret
+        touch /tmp/chown-test/real/sub/file /tmp/chown-test/outside /tmp/chown-test/secret/sensitive
+        ln -s /tmp/chown-test/outside /tmp/chown-test/real/link-to-file
+        ln -s /tmp/chown-test/secret /tmp/chown-test/real/link-to-dir
+
+        # Recursiu sobre directori real: real/ i tot el contingut canvien
+        /usr/bin/chown -R 234:567 /tmp/chown-test/real
+        test "$(stat -c '%u:%g' /tmp/chown-test/real)" = "234:567"
+        test "$(stat -c '%u:%g' /tmp/chown-test/real/sub)" = "234:567"
+        test "$(stat -c '%u:%g' /tmp/chown-test/real/sub/file)" = "234:567"
+
+        # Els symlinks canvien (lchown), però els targets NO
+        test "$(stat -c '%u:%g' /tmp/chown-test/real/link-to-file)" = "234:567"
+        test "$(stat -c '%u:%g' /tmp/chown-test/outside)" = "0:0"
+
+        # No recursem dins de symlinks a directoris
+        test "$(stat -c '%u:%g' /tmp/chown-test/real/link-to-dir)" = "234:567"
+        test "$(stat -c '%u:%g' /tmp/chown-test/secret)" = "0:0"
+        test "$(stat -c '%u:%g' /tmp/chown-test/secret/sensitive)" = "0:0"
+
+        # Path explícit que és un symlink: canvia el symlink, NO el target
+        /usr/bin/chown 111:222 /tmp/chown-test/real/link-to-file
+        test "$(stat -c '%u:%g' /tmp/chown-test/real/link-to-file)" = "111:222"
+        test "$(stat -c '%u:%g' /tmp/chown-test/outside)" = "0:0"

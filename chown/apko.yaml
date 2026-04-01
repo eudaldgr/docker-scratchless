@@ -1,0 +1,26 @@
+contents:
+  repositories:
+    - https://dl-cdn.alpinelinux.org/alpine/edge/main
+  packages:
+    - musl
+    - chown
+
+accounts:
+  run-as: "0"
+
+entrypoint:
+  command: /usr/bin/chown
+
+annotations:
+  org.opencontainers.image.title: "chown"
+  org.opencontainers.image.description: "Minimal chown for distroless containers built on Alpine"
+  org.opencontainers.image.url: "https://github.com/vegops/containers"
+  org.opencontainers.image.source: "https://github.com/vegops/containers/tree/main/chown"
+  org.opencontainers.image.licenses: "MIT"
+
+archs:
+  - x86_64
+  - aarch64
+
+layering:
+  strategy: origin
