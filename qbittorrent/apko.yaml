@@ -29,7 +29,6 @@ work-dir: /qbittorrent
 environment:
   LANG: C.UTF-8
   HOME: /qbittorrent
-  TZ: UTC
 
 paths:
   - path: /opt

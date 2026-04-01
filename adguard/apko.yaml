@@ -28,7 +28,6 @@ work-dir: /adguard/var
 
 environment:
   HOME: /adguard/var
-  TZ: UTC
 
 volumes:
   - /adguard/etc

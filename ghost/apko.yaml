@@ -29,7 +29,6 @@ work-dir: /usr/lib/ghost
 
 environment:
   NODE_ENV: production
-  TZ: UTC
 
 paths:
   - path: /usr/lib/ghost/content

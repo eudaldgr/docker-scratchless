@@ -33,7 +33,6 @@ environment:
   HOST: 0.0.0.0
   NODE_ENV: production
   PORT: "5055"
-  TZ: UTC
 
 volumes:
   - /config
