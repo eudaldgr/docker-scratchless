@@ -33,18 +33,14 @@ accounts:
   run-as: "65532"
 
 entrypoint:
-  command: /usr/lib/sonarr/Sonarr
+  command: /opt/sonarr/Sonarr
 
-cmd: -nobrowser -data=/config
+cmd: -nobrowser -data=/sonarr/etc
 
-work-dir: /config
-
-environment:
-  HOME: /config
-  TZ: UTC
+work-dir: /
 
 paths:
-  - path: /config
+  - path: /sonarr/etc
     type: directory
     uid: 65532
     gid: 65532
