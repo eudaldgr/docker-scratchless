@@ -68,22 +68,22 @@ pipeline:
 
   - uses: cmake/configure
     with:
-      opts: |
-        -Wno-dev \
-        -DQT6=ON \
-        -DGUI=OFF \
-        -DSTACKTRACE=OFF \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DCMAKE_PREFIX_PATH="/usr" \
-        -DCMAKE_BUILD_TYPE="Release" \
-        -DCMAKE_CXX_STANDARD="17" \
-        -DCMAKE_EXE_LINKER_FLAGS="-static" \
-        -DOPENSSL_USE_STATIC_LIBS=TRUE \
-        -DOPENSSL_ROOT_DIR="/usr" \
-        -DOPENSSL_INCLUDE_DIR="/usr/include" \
-        -DOPENSSL_SSL_LIBRARY="/usr/lib/libssl.a" \
-        -DOPENSSL_CRYPTO_LIBRARY="/usr/lib/libcrypto.a" \
-        -DZLIB_INCLUDE_DIR="/usr/include" \
+      opts: >
+        -Wno-dev
+        -DQT6=ON
+        -DGUI=OFF
+        -DSTACKTRACE=OFF
+        -DBUILD_SHARED_LIBS=OFF
+        -DCMAKE_PREFIX_PATH="/usr"
+        -DCMAKE_BUILD_TYPE="Release"
+        -DCMAKE_CXX_STANDARD="17"
+        -DCMAKE_EXE_LINKER_FLAGS="-static"
+        -DOPENSSL_USE_STATIC_LIBS=TRUE
+        -DOPENSSL_ROOT_DIR="/usr"
+        -DOPENSSL_INCLUDE_DIR="/usr/include"
+        -DOPENSSL_SSL_LIBRARY="/usr/lib/libssl.a"
+        -DOPENSSL_CRYPTO_LIBRARY="/usr/lib/libcrypto.a"
+        -DZLIB_INCLUDE_DIR="/usr/include"
         -DZLIB_LIBRARY="/usr/lib/libz.a"
 
   - uses: cmake/build

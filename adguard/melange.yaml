@@ -39,14 +39,9 @@ pipeline:
       go mod tidy
 
   - runs: |
-      case "${{build.arch}}" in
-        x86_64)  TARGETARCH="amd64" ;;
-        aarch64) TARGETARCH="arm64" ;;
-      esac
-
       make \
         OS=linux \
-        ARCH="${TARGETARCH}" \
+        ARCH="${{build.goarch}}" \
         CHANNEL="release" \
         VERSION="${{package.version}}" \
         SIGN=0 \

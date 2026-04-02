@@ -41,11 +41,6 @@ pipeline:
       trap 'rm -rf "$GNUPGHOME"' EXIT
       gpg --import key.txt
 
-      case "${{build.arch}}" in
-        x86_64)  TARGETARCH="amd64" ;;
-        aarch64) TARGETARCH="arm64" ;;
-      esac
-
       BUILD_VERSION="$(curl -s https://plex.tv/api/downloads/5.json | jq -r '.computer.Linux.version')"
 
       if ! echo ${BUILD_VERSION} | grep -q ${{package.version}}; then
@@ -53,7 +48,7 @@ pipeline:
         exit 1
       fi
 
-      wget -q --show-progress --progress=bar:force -O plex.deb https://downloads.plex.tv/plex-media-server-new/${BUILD_VERSION}/debian/plexmediaserver_${BUILD_VERSION}_${TARGETARCH}.deb
+      wget -q --show-progress --progress=bar:force -O plex.deb https://downloads.plex.tv/plex-media-server-new/${BUILD_VERSION}/debian/plexmediaserver_${BUILD_VERSION}_${{build.goarch}}.deb
       gpg --verify plex.deb
 
       mkdir -p rootfs
