@@ -1,0 +1,88 @@
+package:
+  name: lidarr
+  version: 3.1.0.4875 # renovate: datasource=github-releases depName=Lidarr/Lidarr
+  epoch: 0
+  description: Looks and smells like Sonarr but made for music
+  copyright:
+    - license: GPL-3.0
+  options:
+    no-depends: true
+
+vars:
+  dotnet-sdk-version: "10"
+
+environment:
+  environment:
+    DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    LIDARRVERSION: "${{package.version}}"
+    BUILD_SOURCEBRANCHNAME: "v${{package.version}}"
+  contents:
+    repositories:
+      - &wolfi-repository https://packages.wolfi.dev/os
+    keyring:
+      - &wolfi-keyring https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    packages:
+      - bash
+      - build-base
+      - busybox
+      - dotnet-10-sdk
+      - nodejs
+      - pnpm
+      - yarn
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/Lidarr/Lidarr
+      tag: v${{package.version}}
+
+  - runs: |
+      echo '{"sdk":{"version":"${{vars.dotnet-sdk-version}}"}}' > global.json
+      sed -i 's#<TreatWarningsAsErrors>true</TreatWarningsAsErrors>#<TreatWarningsAsErrors>false</TreatWarningsAsErrors>#' src/Directory.Build.props
+
+  - runs: |
+      case "${{build.arch}}" in
+        x86_64)  rid="x64" ;;
+        aarch64) rid="arm64" ;;
+      esac
+      
+      ./build.sh \
+        --backend \
+        --frontend \
+        --packages \
+        -f net8.0 \
+        -r "linux-${rid}"
+
+  - runs: |
+      mkdir -p "${{targets.destdir}}/opt/lidarr"
+      rm -f _output/net*/linux-*/publish/ServiceInstall*
+      rm -f _output/net*/linux-*/publish/ServiceUninstall*
+      rm -f _output/net*/linux-*/publish/Lidarr.Windows*
+      cp -af _output/net*/linux-*/publish/. "${{targets.destdir}}/opt/lidarr/"
+      cp -af _output/UI "${{targets.destdir}}/opt/lidarr/"
+
+  - runs: |
+      chmod -R 0755 "${{targets.destdir}}"/opt/lidarr/*
+
+  - uses: strip
+
+update:
+  enabled: true
+  github:
+    identifier: Lidarr/Lidarr
+    use-tag: true
+    strip-prefix: v
+
+test:
+  environment:
+    contents:
+      repositories:
+        - *wolfi-repository
+      keyring:
+        - *wolfi-keyring
+      packages:
+        - busybox
+  pipeline:
+    - name: Mock test
+      runs: |
+        true
