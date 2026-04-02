@@ -41,6 +41,7 @@
 | `ghcr.io/vegops/go`                 | Go programming language      | Wolfi package (apko-only)          |
 | `ghcr.io/vegops/i2pd`               | I2P daemon                   | Compiled from source (make)        |
 | `ghcr.io/vegops/libtorrent`         | libtorrent-rasterbar library | Compiled from source (CMake)       |
+| `ghcr.io/vegops/lidarr`             | Lidarr music manager         | Compiled from source (.NET + yarn) |
 | `ghcr.io/vegops/lnd`                | Lightning Network Daemon     | Pre-built binaries, GPG verified   |
 | `ghcr.io/vegops/miniupnpc`          | MiniUPnP CLI/Library         | Compiled from source (make)        |
 | `ghcr.io/vegops/openssl`            | OpenSSL CLI                  | Wolfi package (apko-only)          |
