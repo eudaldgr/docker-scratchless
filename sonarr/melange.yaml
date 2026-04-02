@@ -14,8 +14,8 @@ vars:
 environment:
   environment:
     DOTNET_CLI_TELEMETRY_OPTOUT: "1"
-    BRANCH: "v${{package.version}}"
     SONARR_VERSION: "${{package.version}}"
+    BRANCH: "v${{package.version}}"
   contents:
     repositories:
       - &wolfi-repository https://packages.wolfi.dev/os
