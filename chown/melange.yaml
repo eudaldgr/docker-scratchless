@@ -32,6 +32,10 @@ pipeline:
 
   - uses: strip
 
+update:
+  enabled: false
+  exclude-reason: Local utility built from in-repo source; there is no upstream release stream to track.
+
 test:
   environment:
     contents:

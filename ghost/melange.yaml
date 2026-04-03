@@ -76,6 +76,7 @@ pipeline:
 
 update:
   enabled: false
+  exclude-reason: Package updates rely on npm tarballs, checksum refresh, and native module pruning handled by Renovate.
 
 test:
   environment:
