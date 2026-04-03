@@ -6,6 +6,7 @@ on:
     paths:
       - "*/apko.yaml"
       - "*/melange.yaml"
+      - "*/publish.json"
       - ".github/workflows/build.yaml"
   pull_request:
     branches: [main]
@@ -515,8 +516,8 @@ jobs:
             done
           fi
 
-      - name: Extract version
-        id: version
+      - name: Resolve publish metadata
+        id: publish_meta
         uses: ./.github/actions/extract-version
         with:
           package-name: ${{ matrix.name }}
@@ -537,12 +538,18 @@ jobs:
       - name: Rename tarball (x86_64)
         run: mv output.tar ${{ matrix.name }}-x86_64.tar
 
-      - name: Scan image (x86_64)
-        uses: ./.github/actions/scan-image
-        with:
-          image-tar: "${{ matrix.name }}-x86_64.tar"
-          image-name: ${{ matrix.name }}
-          arch: x86_64
+      - name: Rename SBOM (x86_64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          sboms=(sbom-*.spdx.json)
+          if [ "${#sboms[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one x86_64 SBOM, found ${#sboms[@]}"
+            ls -1 sbom-*.spdx.json 2>/dev/null || true
+            exit 1
+          fi
+          mv "${sboms[0]}" "${{ matrix.name }}-x86_64.spdx.json"
 
       - name: Clean SBOMs (aarch64)
         run: rm -f sbom-*.spdx.json
@@ -560,12 +567,141 @@ jobs:
       - name: Rename tarball (aarch64)
         run: mv output.tar ${{ matrix.name }}-aarch64.tar
 
+      - name: Rename SBOM (aarch64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          sboms=(sbom-*.spdx.json)
+          if [ "${#sboms[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one aarch64 SBOM, found ${#sboms[@]}"
+            ls -1 sbom-*.spdx.json 2>/dev/null || true
+            exit 1
+          fi
+          mv "${sboms[0]}" "${{ matrix.name }}-aarch64.spdx.json"
+
+      - name: Resolve release tag
+        id: release_tag
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          RELEASE_TAG_HINT: ${{ steps.publish_meta.outputs.release_tag }}
+          VERSION_SOURCE_PACKAGE: ${{ steps.publish_meta.outputs.version_source_package }}
+        run: |
+          set -euo pipefail
+
+          release_tag="${RELEASE_TAG_HINT}"
+
+          if [ -z "$release_tag" ] && [ -n "$VERSION_SOURCE_PACKAGE" ]; then
+            version_from_sbom() {
+              local sbom="$1"
+              jq -r --arg pkg "$VERSION_SOURCE_PACKAGE" '
+                [.packages[]? | select(.name == $pkg) | .versionInfo // empty][0] // empty
+              ' "$sbom"
+            }
+
+            x86_sbom="${IMAGE_NAME}-x86_64.spdx.json"
+            arm_sbom="${IMAGE_NAME}-aarch64.spdx.json"
+            version_x86_64="$(version_from_sbom "$x86_sbom")"
+            version_aarch64="$(version_from_sbom "$arm_sbom")"
+
+            if [ -z "$version_x86_64" ]; then
+              echo "::error::Package '$VERSION_SOURCE_PACKAGE' not found in $x86_sbom"
+              exit 1
+            fi
+
+            if [ -z "$version_aarch64" ]; then
+              echo "::error::Package '$VERSION_SOURCE_PACKAGE' not found in $arm_sbom"
+              exit 1
+            fi
+
+            if [ "$version_x86_64" != "$version_aarch64" ]; then
+              echo "::error::Package '$VERSION_SOURCE_PACKAGE' resolved different versions across architectures: x86_64=$version_x86_64 aarch64=$version_aarch64"
+              exit 1
+            fi
+
+            release_tag="$version_x86_64"
+          fi
+
+          if [ -z "$release_tag" ]; then
+            release_tag='latest'
+          fi
+
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve publish tags
+        id: publish_tags
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release_tag.outputs.release_tag }}
+          PUBLISH_LATEST: ${{ steps.publish_meta.outputs.publish_latest }}
+        run: |
+          set -euo pipefail
+
+          declare -a tags=()
+
+          add_tag() {
+            local candidate="$1"
+            [ -n "$candidate" ] || return 0
+            local existing
+            for existing in "${tags[@]:-}"; do
+              if [ "$existing" = "$candidate" ]; then
+                return 0
+              fi
+            done
+            tags+=("$candidate")
+          }
+
+          add_tag "$RELEASE_TAG"
+
+          version_core="$RELEASE_TAG"
+          if [[ "$version_core" =~ ^(.+)-r[0-9]+$ ]]; then
+            version_core="${BASH_REMATCH[1]}"
+            add_tag "$version_core"
+          fi
+
+          truncated="$version_core"
+          while [[ "$truncated" == *.* ]]; do
+            truncated="${truncated%.*}"
+            add_tag "$truncated"
+          done
+
+          if [ "$PUBLISH_LATEST" = "true" ]; then
+            add_tag latest
+          fi
+
+          stream_tag=''
+          if [[ "$version_core" =~ ^([0-9]+)(\.|$) ]]; then
+            stream_tag="${BASH_REMATCH[1]}"
+          fi
+
+          published_tags=$(printf '%s\n' "${tags[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "published_tags=$published_tags" >> "$GITHUB_OUTPUT"
+          echo "stream_tag=$stream_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Scan image (x86_64)
+        uses: ./.github/actions/scan-image
+        with:
+          image-tar: "${{ matrix.name }}-x86_64.tar"
+          image-name: ${{ matrix.name }}
+          arch: x86_64
+          repository: ${{ steps.publish_meta.outputs.repository }}
+          release-tag: ${{ steps.release_tag.outputs.release_tag }}
+          stream-tag: ${{ steps.publish_tags.outputs.stream_tag }}
+          published-tags-json: ${{ steps.publish_tags.outputs.published_tags }}
+          sbom-path: "${{ matrix.name }}-x86_64.spdx.json"
+
       - name: Scan image (aarch64)
         uses: ./.github/actions/scan-image
         with:
           image-tar: "${{ matrix.name }}-aarch64.tar"
           image-name: ${{ matrix.name }}
           arch: aarch64
+          repository: ${{ steps.publish_meta.outputs.repository }}
+          release-tag: ${{ steps.release_tag.outputs.release_tag }}
+          stream-tag: ${{ steps.publish_tags.outputs.stream_tag }}
+          published-tags-json: ${{ steps.publish_tags.outputs.published_tags }}
+          sbom-path: "${{ matrix.name }}-aarch64.spdx.json"
 
       - name: Publish multi-arch image
         if: github.event_name != 'pull_request'
@@ -574,25 +710,41 @@ jobs:
         with:
           apko-image: ${{ env.APKO_IMAGE }}
           config: ${{ matrix.name }}/apko.yaml
-          tag: ${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:${{ steps.version.outputs.tag }}
+          tag: ${{ env.REGISTRY_NAMESPACE }}/${{ steps.publish_meta.outputs.repository }}:${{ steps.release_tag.outputs.release_tag }}
           keyring-append: ./melange.rsa.pub
           repository-append: ./packages
           archs: x86_64,aarch64
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Tag latest
+      - name: Publish tag aliases
         if: github.event_name != 'pull_request'
+        env:
+          REPOSITORY: ${{ steps.publish_meta.outputs.repository }}
+          RELEASE_TAG: ${{ steps.release_tag.outputs.release_tag }}
+          PUBLISHED_TAGS: ${{ steps.publish_tags.outputs.published_tags }}
         run: |
-          docker buildx imagetools create \
-            -t ${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:latest \
-            ${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}:${{ steps.version.outputs.tag }}
+          set -euo pipefail
+          source_ref="${{ env.REGISTRY_NAMESPACE }}/${REPOSITORY}:${RELEASE_TAG}"
+          for tag in $(jq -r '.[]' <<<"$PUBLISHED_TAGS"); do
+            if [ "$tag" = "$RELEASE_TAG" ]; then
+              continue
+            fi
+            docker buildx imagetools create \
+              -t "${{ env.REGISTRY_NAMESPACE }}/${REPOSITORY}:${tag}" \
+              "$source_ref"
+          done
 
       - name: Sign image with cosign
         if: github.event_name != 'pull_request'
+        env:
+          REPOSITORY: ${{ steps.publish_meta.outputs.repository }}
         run: |
+          set -euo pipefail
+          digest="${{ steps.publish.outputs.digest }}"
+          digest="${digest##*@}"
           cosign sign \
             --yes \
-            "${{ steps.publish.outputs.digest }}"
+            "${{ env.REGISTRY_NAMESPACE }}/${REPOSITORY}@${digest}"
 
   ##############################################################################
   # SUMMARY                                                                    #

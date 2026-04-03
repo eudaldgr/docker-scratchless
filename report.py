@@ -1,4 +1,9 @@
-import json, glob, html, datetime, os, shutil
+import datetime
+import glob
+import html
+import json
+import os
+import shutil
 
 reports = sorted(glob.glob("reports/**/cve-report-*-*.json", recursive=True))
 
@@ -14,12 +19,34 @@ for rpath in reports:
         name = filename.replace("cve-report-", "").replace(".json", "")
         arch = "unknown"
 
-    if name not in apps:
-        apps[name] = {}
-
     try:
         with open(rpath) as f:
             data = json.load(f)
+        vegops = data.get("vegops", {})
+        source_image = vegops.get("sourceImage", name)
+        repository = vegops.get("repository", source_image)
+        release_tag = vegops.get("releaseTag")
+        stream_tag = vegops.get("streamTag")
+        published_tags = vegops.get("publishedTags", [])
+        app_key = f"{repository}:{release_tag}" if release_tag else repository
+
+        if app_key not in apps:
+            apps[app_key] = {
+                "source_images": set(),
+                "repository": repository,
+                "release_tag": release_tag,
+                "stream_tag": stream_tag,
+                "published_tags": set(),
+                "archs": set(),
+                "vulns": {},
+            }
+
+        app = apps[app_key]
+        app["source_images"].add(source_image)
+        app["archs"].add(arch)
+        for tag in published_tags:
+            app["published_tags"].add(tag)
+
         matches = data.get("matches", [])
         for m in matches:
             artifact_name = m.get("artifact", {}).get("name", "unknown")
@@ -30,8 +57,8 @@ for rpath in reports:
                 vid = v.get("id", "N/A")
                 key = (vid, pkg)
                 
-                if key not in apps[name]:
-                    apps[name][key] = {
+                if key not in app["vulns"]:
+                    app["vulns"][key] = {
                         "id": vid,
                         "severity": v.get("severity", "Unknown"),
                         "description": v.get("description", "")[:200],
@@ -39,8 +66,8 @@ for rpath in reports:
                         "fixed": v.get("fix", {}).get("versions", []),
                         "archs": set()
                     }
-                apps[name][key]["archs"].add(arch)
-    except Exception as e:
+                app["vulns"][key]["archs"].add(arch)
+    except Exception:
         pass
 
 severity_order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3, "Negligible": 4, "Unknown": 5}
@@ -48,8 +75,8 @@ now = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M UTC")
 
 # Summary stats
 total = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
-for app_vulns in apps.values():
-    for v in app_vulns.values():
+for app in apps.values():
+    for v in app["vulns"].values():
         sev = v["severity"]
         if sev in total:
             total[sev] += 1
@@ -273,6 +300,40 @@ page = f"""<!DOCTYPE html>
       display: flex;
       align-items: center;
       gap: 0.5rem;
+    }}
+
+    .image-heading {{
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      min-width: 0;
+    }}
+
+    .image-subtitle {{
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }}
+
+    .image-meta {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }}
+
+    .meta-badge {{
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border: 1px solid rgba(56, 189, 248, 0.18);
+      background: rgba(56, 189, 248, 0.08);
+      color: var(--accent);
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      white-space: nowrap;
     }}
     
     .image-section h2::before {{
@@ -500,20 +561,63 @@ page += '<div class="summary">'
 for sev, count in total.items():
     cls = sev.lower()
     page += f'<div class="card"><h3>{sev}</h3><div class="count {cls}">{count}</div></div>'
-page += f'<div class="card"><h3>Apps Scanned</h3><div class="count count-text">{len(apps)}</div></div>'
+page += f'<div class="card"><h3>Releases Scanned</h3><div class="count count-text">{len(apps)}</div></div>'
 page += "</div>"
 
-for name in sorted(apps.keys()):
-    vuln_dict = apps[name]
-    vulns = list(vuln_dict.values())
+def app_sort_key(item):
+    app = item[1]
+    stream_tag = app["stream_tag"] or ""
+    if stream_tag.isdigit():
+        stream_key = (0, -int(stream_tag))
+    else:
+        stream_key = (1, stream_tag)
+    return (
+        app["repository"],
+        stream_key,
+        app["release_tag"] or "",
+    )
+
+
+for _, app in sorted(apps.items(), key=app_sort_key):
+    vulns = list(app["vulns"].values())
     has_issues = len(vulns) > 0
     status_class = "has-issues" if has_issues else ""
     status_text = f"{len(vulns)} Issues" if has_issues else "Clean"
+    display_name = app["repository"]
+    if app["release_tag"]:
+        display_name = f"{display_name}:{app['release_tag']}"
+
+    subtitle_bits = []
+    if app["stream_tag"]:
+        subtitle_bits.append(f"stream {app['stream_tag']}")
+    if app["source_images"]:
+        subtitle_bits.append("source " + ", ".join(sorted(app["source_images"])))
+    subtitle_html = ""
+    if subtitle_bits:
+        subtitle_html = '<div class="image-subtitle">' + "".join(
+            f"<span>{html.escape(bit)}</span>" for bit in subtitle_bits
+        ) + "</div>"
+
+    meta_tags = []
+    if app["published_tags"]:
+        for tag in sorted(app["published_tags"], key=lambda tag: (tag != "latest", tag)):
+            meta_tags.append(f'<span class="meta-badge">{html.escape(tag)}</span>')
+    if app["archs"]:
+        meta_tags.append(
+            f'<span class="meta-badge">archs: {html.escape(", ".join(sorted(app["archs"])))}</span>'
+        )
+    meta_html = ""
+    if meta_tags:
+        meta_html = '<div class="image-meta">' + "".join(meta_tags) + "</div>"
 
     header_html = f'''
       <div class="image-title-wrapper">
         {'<span class="toggle-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></span>' if has_issues else '<span class="toggle-spacer" aria-hidden="true"></span>'}
-        <h2>{html.escape(name)}</h2>
+        <div class="image-heading">
+          <h2>{html.escape(display_name)}</h2>
+          {subtitle_html}
+          {meta_html}
+        </div>
       </div>
       <div class="status-badge {status_class}">
         <div class="status-dot"></div>
@@ -583,4 +687,4 @@ with open("site/index.html", "w") as f:
 if os.path.exists("logo.png"):
     shutil.copy("logo.png", "site/favicon.png")
 
-print(f"Generated dashboard with {len(apps)} apps")
+print(f"Generated dashboard with {len(apps)} releases")

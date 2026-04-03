@@ -11,6 +11,21 @@ inputs:
   arch:
     description: Target architecture
     required: true
+  repository:
+    description: Public repository name used for publishing and dashboard grouping
+    required: true
+  release-tag:
+    description: Exact release tag for this build
+    required: true
+  stream-tag:
+    description: Stream tag used to group related releases, such as a major version
+    required: false
+  published-tags-json:
+    description: JSON array of all tags published for the image digest
+    required: true
+  sbom-path:
+    description: Path to the renamed SBOM file for this architecture
+    required: true
 
 runs:
   using: composite
@@ -36,6 +51,31 @@ runs:
       run: |
         set -euo pipefail
         mv "${{ steps.grype-json.outputs.json }}" "cve-report-${{ inputs.image-name }}-${{ inputs.arch }}.json"
+
+    - name: Add VegOps scan metadata
+      shell: bash
+      run: |
+        set -euo pipefail
+        tmpfile="$(mktemp)"
+        jq \
+          --arg source_image "${{ inputs.image-name }}" \
+          --arg repository "${{ inputs.repository }}" \
+          --arg release_tag "${{ inputs.release-tag }}" \
+          --arg stream_tag "${{ inputs.stream-tag }}" \
+          --arg arch "${{ inputs.arch }}" \
+          --argjson published_tags '${{ inputs.published-tags-json }}' \
+          '
+            .vegops = {
+              sourceImage: $source_image,
+              repository: $repository,
+              releaseTag: $release_tag,
+              streamTag: (if $stream_tag == "" then null else $stream_tag end),
+              arch: $arch,
+              publishedTags: $published_tags
+            }
+          ' \
+          "cve-report-${{ inputs.image-name }}-${{ inputs.arch }}.json" > "$tmpfile"
+        mv "$tmpfile" "cve-report-${{ inputs.image-name }}-${{ inputs.arch }}.json"
 
     - name: Upload Grype SARIF
       uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
@@ -67,5 +107,5 @@ runs:
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
       with:
         name: sbom-${{ inputs.image-name }}-${{ inputs.arch }}
-        path: sbom-*.spdx.json
+        path: ${{ inputs.sbom-path }}
         retention-days: 90
