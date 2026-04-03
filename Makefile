@@ -39,7 +39,7 @@ define TARBALL
 $(OUT_DIR)/$(1)-$(ARCH).tar
 endef
 
-.PHONY: all help list keygen clean clean-images melange apko build test scan scan-all push
+.PHONY: all help list keygen clean clean-images melange apko build test scan scan-all push report
 
 all: help
 
@@ -60,6 +60,7 @@ help:
 	@echo "  make push                 Push all local images tagged $(TAG)"
 	@echo "  make push-<package>       Push one local image tagged $(TAG)"
 	@echo "  make keygen               Generate Melange signing keys if missing"
+	@echo "  make report               Generate CVE dashboard site"
 	@echo "  make clean                Remove local build artifacts"
 	@echo "  make clean-images         Remove locally tagged images"
 	@echo ""
@@ -163,6 +164,10 @@ scan-full-%: apko-%
 push-%: apko-%
 	@echo "Pushing $(call IMAGE,$*,$(TAG))..."
 	@$(DOCKER) push "$(call IMAGE,$*,$(TAG))"
+
+report:
+	@echo "Generating CVE dashboard..."
+	@python3 .report/report.py
 
 clean:
 	rm -rf $(PACKAGES_DIR) $(OUT_DIR)
