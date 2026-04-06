@@ -19,6 +19,12 @@ outputs:
   version_source_package:
     description: Package name to read an exact version from the generated SBOM
     value: ${{ steps.resolve.outputs.version_source_package }}
+  version_trim_prefix:
+    description: Optional prefix to trim from the resolved release tag
+    value: ${{ steps.resolve.outputs.version_trim_prefix }}
+  version_trim_suffix:
+    description: Optional suffix to trim from the resolved release tag
+    value: ${{ steps.resolve.outputs.version_trim_suffix }}
 
 runs:
   using: composite
@@ -34,6 +40,8 @@ runs:
         repository="$pkg"
         publish_latest='true'
         version_source_package=''
+        version_trim_prefix=''
+        version_trim_suffix=''
         release_tag=''
 
         if [ -f "$publish_json" ]; then
@@ -43,6 +51,8 @@ runs:
           fi
           publish_latest=$(jq -r 'if has("publishLatest") then .publishLatest else true end' "$publish_json")
           version_source_package=$(jq -r '.versionSourcePackage // ""' "$publish_json")
+          version_trim_prefix=$(jq -r '.versionTrimPrefix // ""' "$publish_json")
+          version_trim_suffix=$(jq -r '.versionTrimSuffix // ""' "$publish_json")
         fi
 
         if [ -f "$pkg/melange.yaml" ]; then
@@ -57,3 +67,5 @@ runs:
         echo "repository=$repository" >> "$GITHUB_OUTPUT"
         echo "publish_latest=$publish_latest" >> "$GITHUB_OUTPUT"
         echo "version_source_package=$version_source_package" >> "$GITHUB_OUTPUT"
+        echo "version_trim_prefix=$version_trim_prefix" >> "$GITHUB_OUTPUT"
+        echo "version_trim_suffix=$version_trim_suffix" >> "$GITHUB_OUTPUT"

@@ -585,6 +585,8 @@ jobs:
           IMAGE_NAME: ${{ matrix.name }}
           RELEASE_TAG_HINT: ${{ steps.publish_meta.outputs.release_tag }}
           VERSION_SOURCE_PACKAGE: ${{ steps.publish_meta.outputs.version_source_package }}
+          VERSION_TRIM_PREFIX: ${{ steps.publish_meta.outputs.version_trim_prefix }}
+          VERSION_TRIM_SUFFIX: ${{ steps.publish_meta.outputs.version_trim_suffix }}
         run: |
           set -euo pipefail
 
@@ -619,6 +621,14 @@ jobs:
             fi
 
             release_tag="$version_x86_64"
+          fi
+
+          if [ -n "$VERSION_TRIM_PREFIX" ] && [[ "$release_tag" == "$VERSION_TRIM_PREFIX"* ]]; then
+            release_tag="${release_tag#"$VERSION_TRIM_PREFIX"}"
+          fi
+
+          if [ -n "$VERSION_TRIM_SUFFIX" ] && [[ "$release_tag" == *"$VERSION_TRIM_SUFFIX" ]]; then
+            release_tag="${release_tag%"$VERSION_TRIM_SUFFIX"}"
           fi
 
           if [ -z "$release_tag" ]; then
