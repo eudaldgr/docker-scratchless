@@ -1,10 +1,12 @@
 package:
   name: seerr
   version: 3.1.0 # renovate: datasource=github-releases depName=seerr-team/seerr
-  epoch: 0
+  epoch: 1
   description: Media request manager for Jellyfin, Plex, Emby, Radarr, and Sonarr
   copyright:
     - license: MIT
+  options:
+    no-depends: true
 
 environment:
   environment:
@@ -18,9 +20,13 @@ environment:
       - bash
       - build-base
       - busybox
-      - nodejs-22-minimal
+      - ca-certificates-bundle
+      - node-gyp
+      - nodejs-22
       - npm
       - pnpm
+      - py3.14-setuptools
+      - python-3.14
 
 pipeline:
   - uses: git-checkout
@@ -29,35 +35,46 @@ pipeline:
       tag: v${{package.version}}
 
   - runs: |
-      case "${{build.arch}}" in
-        x86_64)  node_arch="x64" ;;
-        aarch64) node_arch="arm64" ;;
-      esac
+      mkdir -p /home/build/.home
+      rm -rf package
+      mkdir -p package
 
-      export HOME="${PWD}/.home"
-      mkdir -p "${HOME}"
-      prodroot="${PWD}/.prod-deps"
-      mkdir -p "${prodroot}"
+      cp -a package.json pnpm-lock.yaml .npmrc bin package/
 
-      cp -a package.json pnpm-lock.yaml .npmrc bin "${prodroot}/"
+  - working-directory: package
+    runs: |
+      export HOME=/home/build/.home
+      CI=true pnpm install --prod --frozen-lockfile
 
-      (
-        cd "${prodroot}"
-        CI=true pnpm install --prod --frozen-lockfile
-      )
-
+  - runs: |
+      export HOME=/home/build/.home
       CI=true CYPRESS_INSTALL_BINARY=0 pnpm install --frozen-lockfile
       COMMIT_TAG="v${{package.version}}" pnpm build
 
       rm -rf .next/cache
 
+  - working-directory: package
+    runs: |
+      export HOME=/home/build/.home
+      case "${{build.arch}}" in
+        x86_64)  node_arch="x64" ;;
+        aarch64) node_arch="arm64" ;;
+      esac
+
       # Prune unnecessary files from node_modules
       npx --yes @usex/prune-mod@0.0.14 --verbose
-      find "${prodroot}/node_modules" -type d \( -name '*musl*' -o -name 'win64-bin' -o -name 'osx-bin' \) -prune -exec rm -rf {} +
-      find "${prodroot}/node_modules" -type f \( -name '*.dll' -o -name '*.exe' -o -name '*.node' -path '*musl*' \) -delete
-      find "${prodroot}/node_modules" -type d -path '*/prebuilds/*' ! -name "linux-${node_arch}" -prune -exec rm -rf {} +
+      find node_modules -type d \( -name '*musl*' -o -name 'win64-bin' -o -name 'osx-bin' \) -prune -exec rm -rf {} +
+      find node_modules -type f \( -name '*.dll' -o -name '*.exe' -o -name '*.node' -path '*musl*' \) -delete
+      find node_modules -type d -path '*/prebuilds/*' ! -name "linux-${node_arch}" -prune -exec rm -rf {} +
 
-      mkdir -p "${{targets.destdir}}/usr/lib/seerr"
+  - runs: |
+      mkdir -p "${{targets.destdir}}/opt/seerr"
+      mkdir -p \
+        "${{targets.destdir}}/seerr/etc" \
+        "${{targets.destdir}}/seerr/var/cache/images" \
+        "${{targets.destdir}}/seerr/var/db" \
+        "${{targets.destdir}}/seerr/var/log"
+
       cp -a \
         .next \
         dist \
@@ -65,26 +82,24 @@ pipeline:
         package.json \
         public \
         seerr-api.yml \
-        "${{targets.destdir}}/usr/lib/seerr/"
-      cp -a "${prodroot}/node_modules" "${{targets.destdir}}/usr/lib/seerr/"
+        "${{targets.destdir}}/opt/seerr/"
+      cp -a package/node_modules "${{targets.destdir}}/opt/seerr/"
 
       printf '{"commitTag":"v%s"}\n' "${{package.version}}" \
-        > "${{targets.destdir}}/usr/lib/seerr/committag.json"
+        > "${{targets.destdir}}/opt/seerr/committag.json"
 
-      mkdir -p \
-        "${{targets.destdir}}/config/cache/images" \
-        "${{targets.destdir}}/config/db" \
-        "${{targets.destdir}}/config/logs"
-      : > "${{targets.destdir}}/config/DOCKER"
+      ln -sfn /seerr/var/cache "${{targets.destdir}}/seerr/etc/cache"
+      ln -sfn /seerr/var/db "${{targets.destdir}}/seerr/etc/db"
+      ln -sfn /seerr/var/log "${{targets.destdir}}/seerr/etc/logs"
+      : > "${{targets.destdir}}/seerr/etc/DOCKER"
 
-      rm -rf .home .prod-deps
+      rm -rf /home/build/.home package
 
 update:
   enabled: true
   github:
     identifier: seerr-team/seerr
     use-tag: true
-    tag-filter-prefix: v3.
     strip-prefix: v
 
 test:
@@ -101,6 +116,10 @@ test:
   pipeline:
     - name: Basic Seerr package test
       runs: |
-        test -f /usr/lib/seerr/dist/index.js
-        test -f /usr/lib/seerr/package.json
-        node -e "const pkg = require('/usr/lib/seerr/package.json'); if (pkg.version !== '${{package.version}}') process.exit(1)"
+        test -f /opt/seerr/dist/index.js
+        test -f /opt/seerr/package.json
+        test -L /seerr/etc/cache
+        test -L /seerr/etc/db
+        test -L /seerr/etc/logs
+        test -f /seerr/etc/DOCKER
+        node -e "require('/opt/seerr/node_modules/sqlite3'); require('/opt/seerr/node_modules/sharp'); const pkg = require('/opt/seerr/package.json'); if (pkg.version !== '${{package.version}}') process.exit(1)"
