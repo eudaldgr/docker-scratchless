@@ -63,14 +63,30 @@
         "qbittorrent/qBittorrent"
       ],
       "extractVersion": "^release-(?<version>.*)$"
+    },
+    {
+      "matchDatasources": [
+        "custom.plex"
+      ],
+      "extractVersion": "^(?<version>\\d+\\.\\d+\\.\\d+\\.\\d+)(?:-.+)?$",
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)$"
     }
   ],
+  "customDatasources": {
+    "plex": {
+      "defaultRegistryUrlTemplate": "https://plex.tv/api/downloads/5.json",
+      "format": "json",
+      "transformTemplates": [
+        "{ \"releases\": [{ \"version\": computer.Linux.version }], \"homepage\": \"https://www.plex.tv/media-server-downloads/\" }"
+      ]
+    }
+  },
   "customManagers": [
     {
       "customType": "regex",
       "description": "Comment-based updates for melange.yaml (centralized logic)",
-      "fileMatch": [
-        "(^|/)melange\\.yaml$"
+      "managerFilePatterns": [
+        "/(^|/)melange\\.yaml$/"
       ],
       "matchStrings": [
         "(?<part>version|tag):\\s*[\"']?(?<currentValue>[^\\s#\\n\"']+)[\"']?\\s*# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)"
@@ -79,8 +95,8 @@
     {
       "customType": "regex",
       "description": "Automatic updates for simple melange.yaml files",
-      "fileMatch": [
-        "(^|/)melange\\.yaml$"
+      "managerFilePatterns": [
+        "/(^|/)melange\\.yaml$/"
       ],
       "matchStrings": [
         "version:\\s*[\"']?(?<currentValue>[^\\s#\\n\"']+)[\"']?[\\s\\S]*?github:\\s*identifier:\\s*[\"']?(?<depName>[^\\s\\n#\"']+)[\"']?"
@@ -91,8 +107,8 @@
     {
       "customType": "regex",
       "description": "Update pinned MELANGE_VERSION and APKO_VERSION in build workflow",
-      "fileMatch": [
-        "^\\.github/workflows/build\\.yaml$"
+      "managerFilePatterns": [
+        "/^\\.github/workflows/build\\.yaml$/"
       ],
       "matchStrings": [
         "(?<depNameTemplate>MELANGE|APKO)_VERSION: (?<currentValue>\\S+) # renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)"

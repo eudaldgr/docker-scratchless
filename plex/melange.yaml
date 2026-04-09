@@ -1,6 +1,6 @@
 package:
   name: plex
-  version: 1.43.0.10492
+  version: 1.43.1.10576 # renovate: datasource=custom.plex depName=plex
   epoch: 0
   description: Plex Media Server
   copyright:
@@ -77,7 +77,7 @@ pipeline:
 
 update:
   enabled: false
-  exclude-reason: Upstream version discovery depends on the Plex downloads API and arch-specific .deb artifacts, so updates stay manual.
+  exclude-reason: Built-in melange updates stay disabled because Plex releases come from the downloads API and arch-specific .deb artifacts; Renovate tracks the version separately via a custom datasource.
 
 test:
   environment:
