@@ -1,7 +1,7 @@
 package:
   name: ghost
   version: 6.30.0 # renovate: datasource=npm depName=ghost
-  epoch: 1
+  epoch: 2
   description: Professional publishing platform
   copyright:
     - license: MIT
@@ -20,12 +20,12 @@ environment:
       - build-base
       - busybox
       - ca-certificates-bundle
+      - corepack
       - node-gyp
       - nodejs-22
       - npm
       - py3.14-setuptools
       - python-3.14
-      - yarn
 
 pipeline:
   - runs: |
@@ -36,11 +36,12 @@ pipeline:
 
   - working-directory: package
     runs: |
-      yarn install \
+      export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+      corepack enable
+      pnpm install \
         --ignore-scripts \
-        --production \
-        --non-interactive \
-        --prefer-offline
+        --prod \
+        --no-frozen-lockfile
 
   - working-directory: package/node_modules/sqlite3
     runs: |
