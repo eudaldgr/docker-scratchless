@@ -27,6 +27,7 @@ environment:
       - pkgconf
       - postgresql-18-dev
       - rust
+      - scanelf
       - sqlite-dev
 
 pipeline:
@@ -36,17 +37,30 @@ pipeline:
       tag: ${{package.version}}
 
   - runs: |
-      grep -q '^libsqlite3-sys[[:space:]]*=' Cargo.toml || {
-        echo "libsqlite3-sys dependency not found in Cargo.toml" >&2
+      grep -q '^sqlite_system[[:space:]]*=' Cargo.toml || {
+        echo "sqlite_system feature not found in Cargo.toml" >&2
         exit 1
       }
 
-      grep -q '^libsqlite3-sys[[:space:]]*=.*features[[:space:]]*=[[:space:]]*\[[[:space:]]*"bundled"[[:space:]]*\]' Cargo.toml || {
+      grep -q '^sqlite[[:space:]]*=.*"libsqlite3-sys/bundled"' Cargo.toml || {
         echo "expected bundled sqlite feature flag not found" >&2
         exit 1
       }
 
-      sed -i '/^libsqlite3-sys[[:space:]]*=/ s/,[[:space:]]*features[[:space:]]*=[[:space:]]*\[[[:space:]]*"bundled"[[:space:]]*\]//' Cargo.toml
+      sed -i \
+        -e '/^sqlite[[:space:]]*=/ s/"libsqlite3-sys\/bundled"[[:space:]]*,[[:space:]]*//' \
+        -e '/^sqlite[[:space:]]*=/ s/,[[:space:]]*"libsqlite3-sys\/bundled"//' \
+        Cargo.toml
+
+      grep -q '^sqlite[[:space:]]*=.*"sqlite_system"' Cargo.toml || {
+        echo "sqlite feature no longer enables sqlite_system" >&2
+        exit 1
+      }
+
+      ! grep -q '^sqlite[[:space:]]*=.*"libsqlite3-sys/bundled"' Cargo.toml || {
+        echo "bundled sqlite feature flag was not removed" >&2
+        exit 1
+      }
 
   - runs: |
       export CARGO_HOME="${PWD}/.cargo"
@@ -57,6 +71,12 @@ pipeline:
       cargo build \
         --release \
         --features sqlite,mysql,postgresql
+
+      scanelf -n target/release/vaultwarden | grep -q 'libsqlite3\.so' || {
+        echo "vaultwarden is not dynamically linked against system sqlite" >&2
+        scanelf -n target/release/vaultwarden >&2
+        exit 1
+      }
 
       web_vault_digest="$(curl -fsSL "https://hub.docker.com/v2/repositories/vaultwarden/web-vault/tags/v${{vars.web-vault-version}}" | jq -r '.digest')"
       test -n "${web_vault_digest}" && test "${web_vault_digest}" != "null"
